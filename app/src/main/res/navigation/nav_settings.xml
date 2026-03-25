@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_settings"
+    app:startDestination="@id/folderSelectFragment">
+
+    <fragment
+        android:id="@+id/folderSelectFragment"
+        android:name="com.example.digitalcatalogue.ui.folders.FolderSelectFragment"
+        android:label="@string/nav_folders" />
+
+    <fragment
+        android:id="@+id/layoutSelectFragment"
+        android:name="com.example.digitalcatalogue.ui.layout.LayoutSelectFragment"
+        android:label="@string/nav_layout" />
+
+    <fragment
+        android:id="@+id/generalSettingsFragment"
+        android:name="com.example.digitalcatalogue.ui.settings.GeneralSettingsFragment"
+        android:label="@string/nav_settings_title" />
+
+</navigation>

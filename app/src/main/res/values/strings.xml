@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PhotoSlide</string>
+    <string name="wallpaper_description">Displays photos from your selected folders in a grid</string>
+    <string name="settings_title">PhotoSlide Settings</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_folders">Folders</string>
+    <string name="nav_layout">Layout</string>
+    <string name="nav_settings_title">Settings</string>
+
+    <!-- Folder select -->
+    <string name="no_folders_selected">No folders selected.\nTap + to add a folder.</string>
+    <string name="add_folder">Add folder</string>
+    <string name="remove_folder">Remove folder</string>
+
+    <!-- Layout select -->
+    <string name="portrait">Portrait</string>
+    <string name="landscape">Landscape</string>
+    <string name="stagger">Stagger</string>
+    <string name="stagger_none">Off</string>
+
+    <!-- General settings -->
+    <string name="slide_interval">Slide interval</string>
+    <string name="sort_order">Sort order</string>
+    <string name="sort_name_asc">Name (A\u2013Z)</string>
+    <string name="sort_date_desc">Date (newest first)</string>
+    <string name="sort_random">Random</string>
+    <string name="show_spacing">Show spacing</string>
+    <string name="show_spacing_desc">Add gaps between images in the grid</string>
+    <string name="interval_5s">5 seconds</string>
+    <string name="interval_10s">10 seconds</string>
+    <string name="interval_30s">30 seconds</string>
+    <string name="interval_1min">1 minute</string>
+    <string name="interval_5min">5 minutes</string>
+    <string name="interval_15min">15 minutes</string>
+    <string name="interval_30min">30 minutes</string>
+    <string name="interval_1h">1 hour</string>
+    <string name="interval_6h">6 hours</string>
+    <string name="interval_12h">12 hours</string>
+    <string name="interval_24h">24 hours</string>
+    <string name="interval_never">Never</string>
+    <string name="double_tap_advance">Change picture on double tap</string>
+    <string name="double_tap_advance_desc">Double tap a picture on the wallpaper to replace it immediately</string>
+</resources>

@@ -1,0 +1,41 @@
+package com.example.digitalcatalogue.ui.layout
+
+import android.view.LayoutInflater
+import android.view.ViewGroup
+import androidx.recyclerview.widget.RecyclerView
+import com.example.digitalcatalogue.databinding.ItemLayoutOptionBinding
+
+class LayoutOptionAdapter(
+    private val options: List<GridOption>,
+    private var selectedOption: GridOption,
+    private val onSelect: (GridOption) -> Unit
+) : RecyclerView.Adapter<LayoutOptionAdapter.ViewHolder>() {
+
+    inner class ViewHolder(val binding: ItemLayoutOptionBinding) :
+        RecyclerView.ViewHolder(binding.root)
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val binding = ItemLayoutOptionBinding.inflate(
+            LayoutInflater.from(parent.context), parent, false
+        )
+        return ViewHolder(binding)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val option = options[position]
+        holder.binding.gridPreview.cols = option.cols
+        holder.binding.gridPreview.rows = option.rows
+        holder.binding.gridLabel.text = "${option.cols} \u00d7 ${option.rows}"
+        holder.binding.card.isChecked = option == selectedOption
+
+        holder.binding.card.setOnClickListener {
+            val oldPos = options.indexOf(selectedOption)
+            selectedOption = option
+            notifyItemChanged(oldPos)
+            notifyItemChanged(position)
+            onSelect(option)
+        }
+    }
+
+    override fun getItemCount() = options.size
+}

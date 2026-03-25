@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/folderSelectFragment"
+        android:icon="@drawable/ic_folder_open"
+        android:title="@string/nav_folders" />
+
+    <item
+        android:id="@+id/layoutSelectFragment"
+        android:icon="@drawable/ic_grid_view"
+        android:title="@string/nav_layout" />
+
+    <item
+        android:id="@+id/generalSettingsFragment"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/nav_settings_title" />
+
+</menu>
