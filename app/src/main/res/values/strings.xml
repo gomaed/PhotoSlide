@@ -40,6 +40,7 @@
     <string name="interval_12h">12 hours</string>
     <string name="interval_24h">24 hours</string>
     <string name="interval_never">Never</string>
+    <string name="set_wallpaper">Set Wallpaper</string>
     <string name="double_tap_advance">Change picture on double tap</string>
     <string name="double_tap_advance_desc">Double tap a picture on the wallpaper to replace it immediately</string>
 </resources>

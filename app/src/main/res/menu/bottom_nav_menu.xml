@@ -2,9 +2,9 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/folderSelectFragment"
-        android:icon="@drawable/ic_folder_open"
-        android:title="@string/nav_folders" />
+        android:id="@+id/generalSettingsFragment"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/nav_settings_title" />
 
     <item
         android:id="@+id/layoutSelectFragment"
@@ -12,8 +12,8 @@
         android:title="@string/nav_layout" />
 
     <item
-        android:id="@+id/generalSettingsFragment"
-        android:icon="@drawable/ic_settings"
-        android:title="@string/nav_settings_title" />
+        android:id="@+id/folderSelectFragment"
+        android:icon="@drawable/ic_folder_open"
+        android:title="@string/nav_folders" />
 
 </menu>

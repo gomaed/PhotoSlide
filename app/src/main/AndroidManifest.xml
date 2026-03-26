@@ -14,7 +14,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.DigitalCatalogue">
+        android:theme="@style/Theme.PhotoSlide">
 
         <service
             android:name=".wallpaper.LiveWallpaperService"
@@ -33,7 +33,7 @@
             android:name=".ui.SettingsActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.DigitalCatalogue">
+            android:theme="@style/Theme.PhotoSlide">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
