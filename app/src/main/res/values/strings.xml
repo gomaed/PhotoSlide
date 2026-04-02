@@ -10,9 +10,13 @@
     <string name="nav_settings_title">Settings</string>
 
     <!-- Folder select -->
-    <string name="no_folders_selected">No folders selected.\nTap + to add a folder.</string>
-    <string name="add_folder">Add folder</string>
-    <string name="remove_folder">Remove folder</string>
+    <string name="no_folders_selected">No Folders Selected.\nTap + to Add a Folder.</string>
+    <string name="add_folder">Add New</string>
+    <string name="rescan_folders">Rescan</string>
+    <string name="scanning_folders">Scanning Folders…</string>
+    <string name="no_pictures_selected">No Pictures Selected</string>
+    <string name="loading">Loading…</string>
+    <string name="remove_folder">Remove Folder</string>
 
     <!-- Layout select -->
     <string name="portrait">Portrait</string>
@@ -21,26 +25,33 @@
     <string name="stagger_none">Off</string>
 
     <!-- General settings -->
-    <string name="slide_interval">Slide interval</string>
-    <string name="sort_order">Sort order</string>
+    <string name="slide_interval">Slide Interval</string>
+    <string name="picture_fade_time">Fading Duration</string>
+    <string name="fade_off">Off</string>
+    <string name="sort_order">Sort Order</string>
     <string name="sort_name_asc">Name (A\u2013Z)</string>
-    <string name="sort_date_desc">Date (newest first)</string>
+    <string name="sort_date_desc">Date (Newest First)</string>
     <string name="sort_random">Random</string>
-    <string name="show_spacing">Show spacing</string>
-    <string name="show_spacing_desc">Add gaps between images in the grid</string>
-    <string name="interval_5s">5 seconds</string>
-    <string name="interval_10s">10 seconds</string>
-    <string name="interval_30s">30 seconds</string>
-    <string name="interval_1min">1 minute</string>
-    <string name="interval_5min">5 minutes</string>
-    <string name="interval_15min">15 minutes</string>
-    <string name="interval_30min">30 minutes</string>
-    <string name="interval_1h">1 hour</string>
-    <string name="interval_6h">6 hours</string>
-    <string name="interval_12h">12 hours</string>
-    <string name="interval_24h">24 hours</string>
+    <string name="grid_appearance">Grid Appearance</string>
+    <string name="grid_width">Grid Width</string>
+    <string name="grid_width_off">Off</string>
+    <string name="interval_5s">5 Seconds</string>
+    <string name="interval_10s">10 Seconds</string>
+    <string name="interval_30s">30 Seconds</string>
+    <string name="interval_1min">1 Minute</string>
+    <string name="interval_5min">5 Minutes</string>
+    <string name="interval_15min">15 Minutes</string>
+    <string name="interval_30min">30 Minutes</string>
+    <string name="interval_1h">1 Hour</string>
+    <string name="interval_6h">6 Hours</string>
+    <string name="interval_12h">12 Hours</string>
+    <string name="interval_24h">24 Hours</string>
     <string name="interval_never">Never</string>
     <string name="set_wallpaper">Set Wallpaper</string>
-    <string name="double_tap_advance">Change picture on double tap</string>
+    <string name="double_tap_advance">Change Picture on Double Tap</string>
     <string name="double_tap_advance_desc">Double tap a picture on the wallpaper to replace it immediately</string>
+    <string name="grid_corner_radius">Corner Radius</string>
+    <string name="grid_color">Grid Color</string>
+    <string name="grid_color_desc">Background color shown between images</string>
+    <string name="grid_color_picker_title">Choose Grid Color</string>
 </resources>

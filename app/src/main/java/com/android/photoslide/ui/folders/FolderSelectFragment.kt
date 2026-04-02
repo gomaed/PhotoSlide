@@ -9,9 +9,12 @@ import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.android.photoslide.data.AppPreferences
+import com.android.photoslide.data.ImageScanner
 import com.android.photoslide.databinding.FragmentFolderSelectBinding
+import kotlinx.coroutines.launch
 
 class FolderSelectFragment : Fragment() {
 
@@ -47,6 +50,10 @@ class FolderSelectFragment : Fragment() {
             folderPickerLauncher.launch(null)
         }
 
+        binding.fabRescan.setOnClickListener {
+            triggerScan()
+        }
+
         loadFolders()
     }
 
@@ -75,6 +82,7 @@ class FolderSelectFragment : Fragment() {
         uris.add(uri.toString())
         prefs.selectedFolderUris = uris
         loadFolders()
+        triggerScan()
     }
 
     private fun removeFolder(uri: Uri) {
@@ -82,6 +90,13 @@ class FolderSelectFragment : Fragment() {
         uris.remove(uri.toString())
         prefs.selectedFolderUris = uris
         loadFolders()
+        triggerScan()
+    }
+
+    private fun triggerScan() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            ImageScanner.scanToCache(requireContext(), prefs)
+        }
     }
 
     override fun onDestroyView() {

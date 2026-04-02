@@ -8,16 +8,50 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fitsSystemWindows="true">
+        android:fitsSystemWindows="true"
+        android:background="?attr/colorPrimaryContainer">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="80dp"
+            android:background="?attr/colorPrimaryContainer"
             app:title="@string/settings_title"
-            app:titleTextAppearance="@style/TextAppearance.Material3.HeadlineMedium"
-            app:titleTextColor="?attr/colorPrimary"
-            app:titleMarginStart="20dp" />
+            app:titleTextAppearance="@style/TextAppearance.PhotoSlide.ToolbarTitle"
+            app:titleTextColor="?attr/colorOnPrimaryContainer"
+            app:titleMarginStart="20dp">
+
+            <LinearLayout
+                android:id="@+id/scan_indicator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="16dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone">
+
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:id="@+id/scan_spinner"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:indeterminate="true"
+                    app:indicatorSize="16dp"
+                    app:trackThickness="2dp" />
+
+                <TextView
+                    android:id="@+id/scan_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Scanning..."
+                    android:textAppearance="?attr/textAppearanceLabelSmall"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:fontFamily="?attr/fontFamily" />
+
+            </LinearLayout>
+
+        </com.google.android.material.appbar.MaterialToolbar>
 
     </com.google.android.material.appbar.AppBarLayout>
 

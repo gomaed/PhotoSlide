@@ -2,6 +2,7 @@ package com.android.photoslide.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Color
 
 class AppPreferences(context: Context) {
 
@@ -24,9 +25,13 @@ class AppPreferences(context: Context) {
         const val KEY_PORTRAIT_ROWS = "portrait_rows"
         const val KEY_LANDSCAPE_COLS = "landscape_cols"
         const val KEY_LANDSCAPE_ROWS = "landscape_rows"
-        const val KEY_SHOW_SPACING = "show_spacing"
+        const val KEY_GRID_SPACING = "grid_spacing"
         const val KEY_DOUBLE_TAP_ADVANCE = "double_tap_advance"
         const val KEY_STAGGER_RATIO = "stagger_ratio"
+        const val KEY_GRID_COLOR = "grid_color"
+        const val KEY_GRID_CORNER_RADIUS = "grid_corner_radius"
+        const val KEY_IS_SCANNING = "is_scanning"
+        const val KEY_FADE_DURATION = "fade_duration"
     }
 
     var selectedFolderUris: Set<String>
@@ -34,7 +39,7 @@ class AppPreferences(context: Context) {
         set(value) { prefs.edit().putStringSet(KEY_FOLDER_URIS, value).apply() }
 
     var sortOrder: String
-        get() = prefs.getString(KEY_SORT_ORDER, SORT_NAME_ASC) ?: SORT_NAME_ASC
+        get() = prefs.getString(KEY_SORT_ORDER, SORT_RANDOM) ?: SORT_RANDOM
         set(value) { prefs.edit().putString(KEY_SORT_ORDER, value).apply() }
 
     var slideInterval: Int
@@ -57,17 +62,34 @@ class AppPreferences(context: Context) {
         get() = prefs.getInt(KEY_LANDSCAPE_ROWS, 1)
         set(value) { prefs.edit().putInt(KEY_LANDSCAPE_ROWS, value).apply() }
 
-    var showSpacing: Boolean
-        get() = prefs.getBoolean(KEY_SHOW_SPACING, true)
-        set(value) { prefs.edit().putBoolean(KEY_SHOW_SPACING, value).apply() }
+    var gridSpacing: Int
+        get() = prefs.getInt(KEY_GRID_SPACING, 3)
+        set(value) { prefs.edit().putInt(KEY_GRID_SPACING, value).apply() }
 
     var doubleTapAdvance: Boolean
-        get() = prefs.getBoolean(KEY_DOUBLE_TAP_ADVANCE, false)
+        get() = prefs.getBoolean(KEY_DOUBLE_TAP_ADVANCE, true)
         set(value) { prefs.edit().putBoolean(KEY_DOUBLE_TAP_ADVANCE, value).apply() }
+
+    var isScanning: Boolean
+        get() = prefs.getBoolean(KEY_IS_SCANNING, false)
+        set(value) { prefs.edit().putBoolean(KEY_IS_SCANNING, value).apply() }
+
+    var gridCornerRadius: Int
+        get() = prefs.getInt(KEY_GRID_CORNER_RADIUS, 8)
+        set(value) { prefs.edit().putInt(KEY_GRID_CORNER_RADIUS, value).apply() }
+
+    var gridColor: Int
+        get() = prefs.getInt(KEY_GRID_COLOR, Color.BLACK)
+        set(value) { prefs.edit().putInt(KEY_GRID_COLOR, value).apply() }
+
+    // 0 = no fade, 100–1000 = fade duration in ms
+    var fadeDuration: Int
+        get() = prefs.getInt(KEY_FADE_DURATION, 800)
+        set(value) { prefs.edit().putInt(KEY_FADE_DURATION, value).apply() }
 
     // 50 = no stagger (50/50), 70 = max stagger (70/30)
     var staggerRatio: Int
-        get() = prefs.getInt(KEY_STAGGER_RATIO, 50)
+        get() = prefs.getInt(KEY_STAGGER_RATIO, 55)
         set(value) { prefs.edit().putInt(KEY_STAGGER_RATIO, value).apply() }
 
     fun registerChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {

@@ -1,5 +1,7 @@
 package com.android.photoslide.wallpaper
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.content.SharedPreferences
@@ -8,29 +10,110 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
-import android.service.wallpaper.WallpaperService
-import android.view.SurfaceHolder
 import android.provider.DocumentsContract
+import android.service.wallpaper.WallpaperService
+import com.android.photoslide.data.ImageScanner
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.SurfaceHolder
 import android.view.animation.LinearInterpolator
 import com.android.photoslide.data.AppPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class LiveWallpaperService : WallpaperService() {
 
+    // ── Service-level image pool ──────────────────────────────────────────────
+    // Shared across all engine instances (homescreen + preview).
+    // @Volatile so the HandlerThread in each engine sees the latest reference.
+    private val servicePrefs by lazy { AppPreferences(this) }
+    @Volatile var images: List<Uri> = emptyList()
+    private var rawImages: List<Uri> = emptyList()   // unsorted — re-sort on demand
+    private var scanComplete = false
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var scanJob: Job? = null
+
     override fun onCreateEngine(): Engine = WallpaperEngine()
+
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel()
+    }
+
+    /**
+     * Called by an engine when it needs images.
+     * - If we already have a complete scan: re-apply sort and call onReady immediately.
+     * - If a disk cache exists: load it instantly → call onReady → rescan silently in background.
+     * - Otherwise: scan folders first, then call onReady.
+     */
+    fun ensureImages(prefs: AppPreferences, onReady: () -> Unit) {
+        if (scanComplete && rawImages.isNotEmpty()) {
+            images = applySort(prefs)
+            onReady()
+            return
+        }
+        serviceScope.launch {
+            val cached = withContext(Dispatchers.IO) { ImageScanner.loadCache(this@LiveWallpaperService, prefs) }
+            if (cached != null) {
+                rawImages = cached
+                scanComplete = true
+                images = applySort(prefs)
+                onReady()
+            } else {
+                rescan(prefs, silent = false, onComplete = onReady)
+            }
+        }
+    }
+
+    /** Re-apply sort to rawImages (e.g. after sort-order pref change). */
+    fun reapplySort(prefs: AppPreferences) {
+        images = applySort(prefs)
+    }
+
+    /** Discard cached data and force a fresh scan on next ensureImages() call. */
+    fun invalidate() {
+        scanComplete = false
+        rawImages = emptyList()
+        images = emptyList()
+        scanJob?.cancel()
+    }
+
+    private fun applySort(prefs: AppPreferences): List<Uri> = when (prefs.sortOrder) {
+        AppPreferences.SORT_RANDOM    -> rawImages.shuffled()
+        AppPreferences.SORT_DATE_DESC -> rawImages.reversed()
+        else                          -> rawImages.sortedBy { it.lastPathSegment }
+    }
+
+    private fun rescan(
+        prefs: AppPreferences,
+        silent: Boolean,
+        onComplete: (() -> Unit)? = null
+    ) {
+        scanJob?.cancel()
+        scanJob = serviceScope.launch {
+            val scanned = ImageScanner.scanToCache(this@LiveWallpaperService, prefs)
+            rawImages = scanned
+            images = applySort(prefs)
+            scanComplete = true
+            if (!silent) onComplete?.invoke()
+        }
+    }
+
+    // ── Engine ────────────────────────────────────────────────────────────────
 
     inner class WallpaperEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener {
 
@@ -39,22 +122,54 @@ class LiveWallpaperService : WallpaperService() {
         private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
         private val prefs by lazy { AppPreferences(this@LiveWallpaperService) }
 
-        private var images: List<Uri> = emptyList()
-        // Per-cell image indices into `images`
         private var cellIndices: IntArray = IntArray(0)
-        // Which cell advances next
         private var advanceCellPos = 0
         private var bitmaps: Array<Bitmap?> = emptyArray()
+        private var fadingBitmaps: Array<Bitmap?> = emptyArray()
+        private var fadeAlphas: FloatArray = FloatArray(0)
+        private var fadeAnimators: Array<ValueAnimator?> = emptyArray()
 
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        private val bgPaint = Paint().apply { color = Color.BLACK }
-        private val placeholderPaint = Paint().apply { color = Color.DKGRAY }
+        private val bgPaint = Paint()
+        private val placeholderPaint = Paint()
+
+        // 4 tonal shades from the Material You dynamic palette (API 31+),
+        // falling back to neutral greys on older devices.
+        private val placeholderColors: IntArray by lazy {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                intArrayOf(
+                    resources.getColor(android.R.color.system_accent1_200, null),
+                    resources.getColor(android.R.color.system_accent2_400, null),
+                    resources.getColor(android.R.color.system_accent1_400, null),
+                    resources.getColor(android.R.color.system_accent2_200, null),
+                )
+            } else {
+                intArrayOf(0xFF616161.toInt(), 0xFF757575.toInt(),
+                           0xFF9E9E9E.toInt(), 0xFF424242.toInt())
+            }
+        }
 
         private var isLoading = false
         private var loadingRotation = 0f
         private var loadingSweep = 15f
         private var rotationAnimator: ValueAnimator? = null
         private var sweepAnimator: ValueAnimator? = null
+
+        private val noImagesScrimPaint = Paint()
+        private val noImagesTextPaint: Paint by lazy {
+            val ctx = android.view.ContextThemeWrapper(
+                this@LiveWallpaperService,
+                com.android.photoslide.R.style.Theme_PhotoSlide
+            )
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = android.graphics.Typeface.create(
+                    android.widget.TextView(ctx).typeface,
+                    android.graphics.Typeface.BOLD
+                )
+                color = Color.WHITE
+                textAlign = Paint.Align.CENTER
+            }
+        }
 
         private val spinnerTrackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -69,73 +184,81 @@ class LiveWallpaperService : WallpaperService() {
         private var surfaceWidth = 0
         private var surfaceHeight = 0
         private var isVisible = false
-        private var loadJob: Job? = null
+        private var pillRect = RectF()
 
         private val gestureDetector by lazy {
             GestureDetector(this@LiveWallpaperService,
                 object : GestureDetector.SimpleOnGestureListener() {
+                    override fun onSingleTapUp(e: MotionEvent): Boolean {
+                        if (images.isEmpty() && pillRect.contains(e.x, e.y)) {
+                            val intent = android.content.Intent(
+                                this@LiveWallpaperService,
+                                com.android.photoslide.ui.SettingsActivity::class.java
+                            ).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                putExtra("go_to_folders", true)
+                            }
+                            startActivity(intent)
+                            return true
+                        }
+                        return false
+                    }
                     override fun onDoubleTap(e: MotionEvent): Boolean {
-                        if (prefs.doubleTapAdvance && images.isNotEmpty() && cellIndices.isNotEmpty()) {
+                        val imgs = this@LiveWallpaperService.images
+                        if (prefs.doubleTapAdvance && imgs.isNotEmpty() && cellIndices.isNotEmpty()) {
                             val cell = cellAtPosition(e.x, e.y)
-                            cellIndices[cell] = (cellIndices[cell] + 1) % images.size
-                            scope.launch { reloadCell(cell) }
+                            cellIndices[cell] = (cellIndices[cell] + 1) % imgs.size
+                            scope.launch { reloadCell(cell, if (prefs.fadeDuration == 0) 0L else 200L) }
                         }
                         return true
                     }
                 })
         }
 
-        private val isLandscape get() = surfaceWidth > surfaceHeight
-        private val currentCols get() = if (isLandscape) prefs.landscapeCols else prefs.portraitCols
-        private val currentRows get() = if (isLandscape) prefs.landscapeRows else prefs.portraitRows
+        private val isLandscape  get() = surfaceWidth > surfaceHeight
+        private val currentCols  get() = if (isLandscape) prefs.landscapeCols else prefs.portraitCols
+        private val currentRows  get() = if (isLandscape) prefs.landscapeRows else prefs.portraitRows
 
         private fun cellRects(): List<RectF> {
             val cols = currentCols
             val rows = currentRows
             val cellW = surfaceWidth / cols.toFloat()
             val uniformCellH = surfaceHeight / rows.toFloat()
-            val ratio = prefs.staggerRatio / 100f  // 0.50f..0.70f
+            val ratio = prefs.staggerRatio / 100f
 
-            // No stagger if ratio is neutral or only 1 row
             if (ratio <= 0.5f || rows <= 1) {
                 return List(cols * rows) { i ->
-                    val col = i % cols
-                    val row = i / cols
+                    val col = i % cols; val row = i / cols
                     RectF(col * cellW, row * uniformCellH, (col + 1) * cellW, (row + 1) * uniformCellH)
                 }
             }
 
-            // Precompute cumulative tops per column — adjacent columns alternate tall/short rows.
-            // Scale factor k is computed per column so all rows stagger and heights sum to surfaceHeight.
             val colTops = Array(cols) { col ->
                 val tallCount = (0 until rows).count { row -> (row + col) % 2 == 0 }
                 val shortCount = rows - tallCount
                 val k = surfaceHeight / (tallCount * ratio + shortCount * (1f - ratio))
-                val tallH = ratio * k
-                val shortH = (1f - ratio) * k
+                val tallH = ratio * k; val shortH = (1f - ratio) * k
                 FloatArray(rows + 1).also { tops ->
                     tops[0] = 0f
-                    for (row in 0 until rows) {
+                    for (row in 0 until rows)
                         tops[row + 1] = tops[row] + if ((row + col) % 2 == 0) tallH else shortH
-                    }
                 }
             }
 
             return List(cols * rows) { i ->
-                val col = i % cols
-                val row = i / cols
+                val col = i % cols; val row = i / cols
                 RectF(col * cellW, colTops[col][row], (col + 1) * cellW, colTops[col][row + 1])
             }
         }
 
-        // Advances exactly one cell, then schedules the next tick
         private val advanceRunnable = object : Runnable {
             override fun run() {
-                if (images.isNotEmpty() && cellIndices.isNotEmpty()) {
-                    cellIndices[advanceCellPos] = (cellIndices[advanceCellPos] + 1) % images.size
+                val imgs = this@LiveWallpaperService.images
+                if (imgs.isNotEmpty() && cellIndices.isNotEmpty()) {
+                    cellIndices[advanceCellPos] = (cellIndices[advanceCellPos] + 1) % imgs.size
                     val cell = advanceCellPos
                     advanceCellPos = (advanceCellPos + 1) % cellIndices.size
-                    scope.launch { reloadCell(cell) }
+                    scope.launch { reloadCell(cell, prefs.fadeDuration.toLong()) }
                 }
                 if (isVisible) scheduleNextAdvance()
             }
@@ -144,9 +267,8 @@ class LiveWallpaperService : WallpaperService() {
         private fun scheduleNextAdvance() {
             handler.removeCallbacks(advanceRunnable)
             val interval = prefs.slideInterval
-            if (interval != AppPreferences.INTERVAL_NEVER) {
+            if (interval != AppPreferences.INTERVAL_NEVER)
                 handler.postDelayed(advanceRunnable, interval * 1000L)
-            }
         }
 
         override fun onCreate(surfaceHolder: SurfaceHolder) {
@@ -157,9 +279,7 @@ class LiveWallpaperService : WallpaperService() {
             setTouchEventsEnabled(true)
         }
 
-        override fun onTouchEvent(event: MotionEvent) {
-            gestureDetector.onTouchEvent(event)
-        }
+        override fun onTouchEvent(event: MotionEvent) { gestureDetector.onTouchEvent(event) }
 
         override fun onDestroy() {
             super.onDestroy()
@@ -167,6 +287,7 @@ class LiveWallpaperService : WallpaperService() {
             handler.removeCallbacksAndMessages(null)
             handlerThread.quitSafely()
             scope.cancel()
+            fadeAnimators.forEach { it?.cancel() }
             recycleBitmaps()
             stopLoadingAnimation()
         }
@@ -174,8 +295,8 @@ class LiveWallpaperService : WallpaperService() {
         override fun onVisibilityChanged(visible: Boolean) {
             isVisible = visible
             if (visible) {
-                if (images.isEmpty()) {
-                    loadImages()
+                if (this@LiveWallpaperService.images.isEmpty()) {
+                    startLoading()
                 } else {
                     scope.launch { refreshBitmaps() }
                 }
@@ -189,25 +310,33 @@ class LiveWallpaperService : WallpaperService() {
             super.onSurfaceChanged(holder, format, width, height)
             surfaceWidth = width
             surfaceHeight = height
-            if (images.isNotEmpty()) {
+            if (this@LiveWallpaperService.images.isNotEmpty()) {
                 scope.launch { refreshBitmaps() }
             } else {
-                loadImages()
+                startLoading()
             }
         }
 
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
             when (key) {
-                AppPreferences.KEY_FOLDER_URIS,
-                AppPreferences.KEY_SORT_ORDER -> loadImages()
-
+                AppPreferences.KEY_FOLDER_URIS -> {
+                    this@LiveWallpaperService.invalidate()
+                    startLoading()
+                }
+                AppPreferences.KEY_SORT_ORDER -> {
+                    // No rescan needed — just re-sort rawImages and reload bitmaps
+                    this@LiveWallpaperService.reapplySort(prefs)
+                    scope.launch { reloadAllBitmaps() }
+                }
                 AppPreferences.KEY_PORTRAIT_COLS,
                 AppPreferences.KEY_PORTRAIT_ROWS,
                 AppPreferences.KEY_LANDSCAPE_COLS,
                 AppPreferences.KEY_LANDSCAPE_ROWS,
                 AppPreferences.KEY_STAGGER_RATIO -> scope.launch { reloadAllBitmaps() }
 
-                AppPreferences.KEY_SHOW_SPACING -> drawFrame()
+                AppPreferences.KEY_GRID_SPACING,
+                AppPreferences.KEY_GRID_COLOR,
+                AppPreferences.KEY_GRID_CORNER_RADIUS -> drawFrame()
 
                 AppPreferences.KEY_SLIDE_INTERVAL -> {
                     if (isVisible) scheduleNextAdvance()
@@ -215,146 +344,99 @@ class LiveWallpaperService : WallpaperService() {
             }
         }
 
-        private fun collectImages(treeUri: Uri, docId: String, result: MutableList<Uri>) {
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
-            contentResolver.query(
-                childrenUri,
-                arrayOf(
-                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                    DocumentsContract.Document.COLUMN_MIME_TYPE
-                ),
-                null, null, null
-            )?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val childId = cursor.getString(0) ?: continue
-                    val mime = cursor.getString(1) ?: continue
-                    when {
-                        mime.startsWith("image/") ->
-                            result.add(DocumentsContract.buildDocumentUriUsingTree(treeUri, childId))
-                        mime == DocumentsContract.Document.MIME_TYPE_DIR ->
-                            collectImages(treeUri, childId, result)
-                    }
-                }
+        // Start the loading sequence: show spinner, then decode once images are ready.
+        private fun startLoading() {
+            isLoading = true
+            startLoadingAnimation()
+            this@LiveWallpaperService.ensureImages(prefs) {
+                scope.launch { reloadAllBitmaps() }
             }
         }
 
         private fun startLoadingAnimation() {
-            rotationAnimator?.cancel()
-            sweepAnimator?.cancel()
-
-            // Continuous rotation — drives the drawFrame() calls
+            rotationAnimator?.cancel(); sweepAnimator?.cancel()
             rotationAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
-                duration = 900
-                repeatCount = ValueAnimator.INFINITE
-                repeatMode = ValueAnimator.RESTART
-                interpolator = LinearInterpolator()
-                addUpdateListener {
-                    loadingRotation = it.animatedValue as Float
-                    drawFrame()
-                }
+                duration = 900; repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.RESTART; interpolator = LinearInterpolator()
+                addUpdateListener { loadingRotation = it.animatedValue as Float; drawFrame() }
                 start()
             }
-
-            // Sweep grows and shrinks on a different period — creates expressive, non-repeating motion
             sweepAnimator = ValueAnimator.ofFloat(15f, 280f).apply {
-                duration = 1400
-                repeatCount = ValueAnimator.INFINITE
-                repeatMode = ValueAnimator.REVERSE
-                interpolator = AccelerateDecelerateInterpolator()
+                duration = 1400; repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.REVERSE; interpolator = AccelerateDecelerateInterpolator()
                 addUpdateListener { loadingSweep = it.animatedValue as Float }
                 start()
             }
         }
 
         private fun stopLoadingAnimation() {
-            rotationAnimator?.cancel()
-            sweepAnimator?.cancel()
-            rotationAnimator = null
-            sweepAnimator = null
-        }
-
-        private fun loadImages() {
-            isLoading = true
-            startLoadingAnimation()
-            loadJob?.cancel()
-            loadJob = scope.launch {
-                val uris = withContext(Dispatchers.IO) {
-                    val result = mutableListOf<Uri>()
-                    for (uriStr in prefs.selectedFolderUris) {
-                        try {
-                            val treeUri = Uri.parse(uriStr)
-                            collectImages(treeUri, DocumentsContract.getTreeDocumentId(treeUri), result)
-                        } catch (_: Exception) {
-                        }
-                    }
-                    when (prefs.sortOrder) {
-                        AppPreferences.SORT_RANDOM -> result.shuffled()
-                        AppPreferences.SORT_DATE_DESC -> result.reversed()
-                        else -> result.sortedBy { it.lastPathSegment }
-                    }
-                }
-                images = uris
-                reloadAllBitmaps()
-            }
+            rotationAnimator?.cancel(); sweepAnimator?.cancel()
+            rotationAnimator = null; sweepAnimator = null
         }
 
         private suspend fun reloadAllBitmaps() {
             if (surfaceWidth == 0 || surfaceHeight == 0) return
+            val imgs = this@LiveWallpaperService.images
             val rects = cellRects()
             val needed = rects.size
 
-            // Space cells evenly across the full image list so they never show
-            // consecutive images — step = images.size / needed keeps them far apart
-            val step = if (images.size > needed) images.size / needed else 1
+            val step = if (imgs.size > needed) imgs.size / needed else 1
             cellIndices = IntArray(needed) { i ->
-                if (images.isEmpty()) 0 else (i * step) % images.size
+                if (imgs.isEmpty()) 0 else (i * step) % imgs.size
             }
             advanceCellPos = 0
 
+            // ③ Parallel decode — all cells decoded concurrently on the IO thread pool
             val newBitmaps = withContext(Dispatchers.IO) {
-                Array(needed) { i ->
-                    if (images.isEmpty()) return@Array null
-                    val r = rects[i]
-                    try {
-                        decodeSampledBitmap(images[cellIndices[i]], r.width().toInt(), r.height().toInt())
-                    } catch (_: Exception) {
-                        null
-                    }
+                coroutineScope {
+                    (0 until needed).map { i ->
+                        async {
+                            if (imgs.isEmpty()) return@async null
+                            val r = rects[i]
+                            try { decodeSampledBitmap(imgs[cellIndices[i]], r.width().toInt(), r.height().toInt()) }
+                            catch (_: Exception) { null }
+                        }
+                    }.awaitAll().toTypedArray()
                 }
             }
 
+            fadeAnimators.forEach { it?.cancel() }
             recycleBitmaps()
             bitmaps = newBitmaps
+            fadingBitmaps = Array(needed) { null }
+            fadeAlphas = FloatArray(needed) { 1f }
+            fadeAnimators = Array(needed) { null }
             isLoading = false
             stopLoadingAnimation()
             drawFrame()
         }
 
-        // Re-decode bitmaps from existing cellIndices (preserves which image each cell shows).
-        // Falls back to reloadAllBitmaps() when the grid cell count has changed.
         private suspend fun refreshBitmaps() {
             if (surfaceWidth == 0 || surfaceHeight == 0) return
+            val imgs = this@LiveWallpaperService.images
             val rects = cellRects()
             val needed = rects.size
-            if (cellIndices.size != needed) {
-                reloadAllBitmaps()
-                return
-            }
+            if (cellIndices.size != needed) { reloadAllBitmaps(); return }
 
             val newBitmaps = withContext(Dispatchers.IO) {
-                Array(needed) { i ->
-                    if (images.isEmpty()) return@Array null
-                    val r = rects[i]
-                    try {
-                        decodeSampledBitmap(images[cellIndices[i]], r.width().toInt(), r.height().toInt())
-                    } catch (_: Exception) {
-                        null
-                    }
+                coroutineScope {
+                    (0 until needed).map { i ->
+                        async {
+                            if (imgs.isEmpty()) return@async null
+                            val r = rects[i]
+                            try { decodeSampledBitmap(imgs[cellIndices[i]], r.width().toInt(), r.height().toInt()) }
+                            catch (_: Exception) { null }
+                        }
+                    }.awaitAll().toTypedArray()
                 }
             }
 
+            fadeAnimators.forEach { it?.cancel() }
             recycleBitmaps()
             bitmaps = newBitmaps
+            fadingBitmaps = Array(needed) { null }
+            fadeAlphas = FloatArray(needed) { 1f }
+            fadeAnimators = Array(needed) { null }
             drawFrame()
         }
 
@@ -362,137 +444,284 @@ class LiveWallpaperService : WallpaperService() {
             val rects = cellRects()
             val idx = rects.indexOfFirst { it.contains(x, y) }
             if (idx >= 0) return idx
-            // fallback: nearest cell centre
             return rects.indices.minByOrNull { i ->
-                val cx = rects[i].centerX() - x
-                val cy = rects[i].centerY() - y
+                val cx = rects[i].centerX() - x; val cy = rects[i].centerY() - y
                 cx * cx + cy * cy
             }?.coerceIn(0, cellIndices.size - 1) ?: 0
         }
 
-        // Reload only a single cell after it has been advanced
-        private suspend fun reloadCell(cellPos: Int) {
+        private suspend fun reloadCell(cellPos: Int, fadeDuration: Long = 800) {
             if (surfaceWidth == 0 || surfaceHeight == 0) return
             if (cellPos >= bitmaps.size || cellPos >= cellIndices.size) return
             val rects = cellRects()
             if (cellPos >= rects.size) return
+            val imgs = this@LiveWallpaperService.images
+            if (imgs.isEmpty()) return
             val r = rects[cellPos]
+            val imageIdx = cellIndices[cellPos] % imgs.size
 
             val newBitmap = withContext(Dispatchers.IO) {
-                if (images.isEmpty()) return@withContext null
-                try {
-                    decodeSampledBitmap(images[cellIndices[cellPos]], r.width().toInt(), r.height().toInt())
-                } catch (_: Exception) {
-                    null
-                }
+                try { decodeSampledBitmap(imgs[imageIdx], r.width().toInt(), r.height().toInt()) }
+                catch (_: Exception) { null }
             }
 
-            bitmaps[cellPos]?.recycle()
-            bitmaps[cellPos] = newBitmap
-            drawFrame()
+            fadeAnimators[cellPos]?.cancel()
+
+            if (fadeDuration <= 0L) {
+                fadingBitmaps[cellPos]?.recycle()
+                fadingBitmaps[cellPos] = null
+                bitmaps[cellPos]?.recycle()
+                bitmaps[cellPos] = newBitmap
+                fadeAlphas[cellPos] = 1f
+                fadeAnimators[cellPos] = null
+                drawFrame()
+            } else {
+                fadingBitmaps[cellPos]?.recycle()
+                fadingBitmaps[cellPos] = bitmaps[cellPos]
+                bitmaps[cellPos] = newBitmap
+                fadeAlphas[cellPos] = 0f
+
+                fadeAnimators[cellPos] = ValueAnimator.ofFloat(0f, 1f).apply {
+                    duration = fadeDuration; interpolator = LinearInterpolator()
+                    addUpdateListener { fadeAlphas[cellPos] = it.animatedValue as Float; drawFrame() }
+                    addListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator) {
+                            fadingBitmaps[cellPos]?.recycle()
+                            fadingBitmaps[cellPos] = null
+                            fadeAlphas[cellPos] = 1f
+                        }
+                    })
+                    start()
+                }
+            }
         }
 
         private fun decodeSampledBitmap(uri: Uri, reqWidth: Int, reqHeight: Int): Bitmap? {
             val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, opts)
-            }
+            contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
             opts.inSampleSize = calculateSampleSize(opts, reqWidth, reqHeight)
             opts.inJustDecodeBounds = false
-            return contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, opts)
-            }
+            return contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
         }
 
-        private fun calculateSampleSize(
-            opts: BitmapFactory.Options,
-            reqWidth: Int,
-            reqHeight: Int
-        ): Int {
-            val h = opts.outHeight
-            val w = opts.outWidth
+        private fun calculateSampleSize(opts: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+            val h = opts.outHeight; val w = opts.outWidth
             var sampleSize = 1
             if (h > reqHeight || w > reqWidth) {
-                val halfH = h / 2
-                val halfW = w / 2
-                while ((halfH / sampleSize) >= reqHeight && (halfW / sampleSize) >= reqWidth) {
+                val halfH = h / 2; val halfW = w / 2
+                while ((halfH / sampleSize) >= reqHeight && (halfW / sampleSize) >= reqWidth)
                     sampleSize *= 2
-                }
             }
             return sampleSize
         }
 
         private fun drawFrame() {
-            val holder = surfaceHolder
-            var canvas: Canvas? = null
-            try {
-                canvas = holder.lockCanvas()
-                canvas?.let { drawScene(it) }
-            } finally {
-                canvas?.let { holder.unlockCanvasAndPost(it) }
-            }
+            val holder = surfaceHolder; var canvas: Canvas? = null
+            try { canvas = holder.lockHardwareCanvas(); canvas?.let { drawScene(it) } }
+            finally { canvas?.let { holder.unlockCanvasAndPost(it) } }
         }
 
         private fun drawScene(canvas: Canvas) {
-            canvas.drawRect(
-                0f, 0f, surfaceWidth.toFloat(), surfaceHeight.toFloat(), bgPaint
-            )
-            val spacing = if (prefs.showSpacing) 2f else 0f
+            bgPaint.color = prefs.gridColor
+            canvas.drawRect(0f, 0f, surfaceWidth.toFloat(), surfaceHeight.toFloat(), bgPaint)
+
+            val spacing = prefs.gridSpacing.toFloat()
+            val cornerRadius = prefs.gridCornerRadius.toFloat()
             val rects = cellRects()
+            val cols = currentCols
+            val rows = currentRows
 
             bitmaps.forEachIndexed { idx, bitmap ->
                 if (idx >= rects.size) return@forEachIndexed
                 val r = rects[idx]
+                val col = idx % cols; val row = idx / cols
                 val dest = RectF(
-                    r.left + spacing, r.top + spacing,
-                    r.right - spacing, r.bottom - spacing
+                    if (col > 0) r.left + spacing else r.left,
+                    if (row > 0) r.top + spacing else r.top,
+                    if (col < cols - 1) r.right - spacing else r.right,
+                    if (row < rows - 1) r.bottom - spacing else r.bottom
                 )
 
+                canvas.save()
+                if (cornerRadius > 0f) {
+                    val tlR = if (col > 0 && row > 0) cornerRadius else 0f
+                    val trR = if (col < cols - 1 && row > 0) cornerRadius else 0f
+                    val brR = if (col < cols - 1 && row < rows - 1) cornerRadius else 0f
+                    val blR = if (col > 0 && row < rows - 1) cornerRadius else 0f
+                    canvas.clipPath(Path().apply {
+                        addRoundRect(dest, floatArrayOf(tlR, tlR, trR, trR, brR, brR, blR, blR), Path.Direction.CW)
+                    })
+                }
+
+                val alpha = fadeAlphas.getOrElse(idx) { 1f }
+                val fading = fadingBitmaps.getOrNull(idx)
+
+                if (fading != null) {
+                    paint.alpha = 255
+                    canvas.drawBitmap(fading, centerCropRect(fading.width, fading.height, dest.width().toInt(), dest.height().toInt()), dest, paint)
+                }
                 if (bitmap != null) {
-                    val src = centerCropRect(
-                        bitmap.width, bitmap.height, dest.width().toInt(), dest.height().toInt()
-                    )
-                    canvas.drawBitmap(bitmap, src, dest, paint)
-                } else {
+                    paint.alpha = (alpha * 255).toInt()
+                    canvas.drawBitmap(bitmap, centerCropRect(bitmap.width, bitmap.height, dest.width().toInt(), dest.height().toInt()), dest, paint)
+                    paint.alpha = 255
+                } else if (fading == null) {
+                    placeholderPaint.color = placeholderColors[idx % 4]
                     canvas.drawRect(dest, placeholderPaint)
+                }
+
+                    canvas.restore()
+            }
+
+            if (bitmaps.isEmpty()) {
+                rects.forEachIndexed { idx, r ->
+                    val col = idx % cols; val row = idx / cols
+                    val dest = RectF(
+                        if (col > 0) r.left + spacing else r.left,
+                        if (row > 0) r.top + spacing else r.top,
+                        if (col < cols - 1) r.right - spacing else r.right,
+                        if (row < rows - 1) r.bottom - spacing else r.bottom
+                    )
+                    canvas.save()
+                    if (cornerRadius > 0f) {
+                        val tlR = if (col > 0 && row > 0) cornerRadius else 0f
+                        val trR = if (col < cols - 1 && row > 0) cornerRadius else 0f
+                        val brR = if (col < cols - 1 && row < rows - 1) cornerRadius else 0f
+                        val blR = if (col > 0 && row < rows - 1) cornerRadius else 0f
+                        canvas.clipPath(Path().apply {
+                            addRoundRect(dest, floatArrayOf(tlR, tlR, trR, trR, brR, brR, blR, blR), Path.Direction.CW)
+                        })
+                    }
+                    placeholderPaint.color = placeholderColors[idx % 4]
+                    canvas.drawRect(dest, placeholderPaint)
+                    canvas.restore()
                 }
             }
 
-            if (isLoading) drawLoadingSpinner(canvas)
+            if (!isLoading && images.isEmpty()) drawNoImagesLabel(canvas)
+            if (isLoading) drawLoadingPill(canvas)
         }
 
-        private fun drawLoadingSpinner(canvas: Canvas) {
+        private fun drawLoadingPill(canvas: Canvas) {
+            val text = this@LiveWallpaperService.getString(com.android.photoslide.R.string.loading)
+            noImagesTextPaint.textSize = surfaceWidth * 0.048f
+            val fm = noImagesTextPaint.fontMetrics
+            val textW = noImagesTextPaint.measureText(text)
+            val textH = fm.descent - fm.ascent
+
+            val spinnerSize = textH * 0.85f
+            val gap = textH * 0.5f
+            val padH = textH * 1.1f
+            val padV = textH * 0.6f
+            val contentW = spinnerSize + gap + textW
+            val pillW = contentW + padH * 2f
+            val pillH = textH + padV * 2f
+            val radius = pillH / 2f
+
             val cx = surfaceWidth / 2f
             val cy = surfaceHeight / 2f
-            val radius = minOf(surfaceWidth, surfaceHeight) * 0.09f
-            val strokeWidth = radius * 0.18f
+            val left = cx - pillW / 2f
+            val top = cy - pillH / 2f
+            val right = cx + pillW / 2f
+            val bottom = cy + pillH / 2f
 
+            // Shadow layers
+            val shadowAlphas = intArrayOf(18, 28, 40, 55)
+            val shadowDys   = floatArrayOf(10f, 7f, 5f, 3f)
+            val shadowExp   = floatArrayOf(10f, 7f, 4f, 1f)
+            for (i in shadowAlphas.indices) {
+                val e = shadowExp[i]; val dy = shadowDys[i]
+                noImagesScrimPaint.color = Color.argb(shadowAlphas[i], 0, 0, 0)
+                canvas.drawRoundRect(left - e, top + dy - e, right + e, bottom + dy + e,
+                                     radius + e, radius + e, noImagesScrimPaint)
+            }
+
+            // Pill background
+            val pillColor = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S)
+                resources.getColor(android.R.color.system_neutral1_800, null)
+            else Color.argb(230, 40, 38, 46)
+            noImagesScrimPaint.color = pillColor
+            canvas.drawRoundRect(left, top, right, bottom, radius, radius, noImagesScrimPaint)
+
+            // Small spinner on the left of the content
+            val contentLeft = cx - contentW / 2f
+            val spinnerCx = contentLeft + spinnerSize / 2f
+            val spinnerRadius = spinnerSize / 2f
+            val strokeWidth = spinnerSize * 0.15f
             spinnerTrackPaint.strokeWidth = strokeWidth
             spinnerPaint.strokeWidth = strokeWidth
-
-            val oval = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
+            val oval = RectF(spinnerCx - spinnerRadius, cy - spinnerRadius,
+                             spinnerCx + spinnerRadius, cy + spinnerRadius)
             canvas.drawArc(oval, 0f, 360f, false, spinnerTrackPaint)
             canvas.drawArc(oval, loadingRotation - 90f, loadingSweep, false, spinnerPaint)
+
+            // Text to the right of the spinner
+            val textCenterX = contentLeft + spinnerSize + gap + textW / 2f
+            val baselineY = cy - (fm.ascent + fm.descent) / 2f
+            canvas.drawText(text, textCenterX, baselineY, noImagesTextPaint)
+        }
+
+        private fun drawNoImagesLabel(canvas: Canvas) {
+            val text = this@LiveWallpaperService.getString(com.android.photoslide.R.string.no_pictures_selected)
+            noImagesTextPaint.textSize = surfaceWidth * 0.048f
+            val fm = noImagesTextPaint.fontMetrics
+            val textW = noImagesTextPaint.measureText(text)
+            val textH = fm.descent - fm.ascent
+
+            val padH = textH * 1.1f
+            val padV = textH * 0.6f
+            val pillW = textW + padH * 2f
+            val pillH = textH + padV * 2f
+            val radius = pillH / 2f
+
+            val cx = surfaceWidth / 2f
+            val cy = surfaceHeight / 2f
+            val left = cx - pillW / 2f
+            val top = cy - pillH / 2f
+            val right = cx + pillW / 2f
+            val bottom = cy + pillH / 2f
+
+            // Simulated drop shadow — 4 layers (hardware canvas has no blur support)
+            val shadowAlphas = intArrayOf(18, 28, 40, 55)
+            val shadowDys   = floatArrayOf(10f, 7f, 5f, 3f)
+            val shadowExp   = floatArrayOf(10f, 7f, 4f, 1f)
+            for (i in shadowAlphas.indices) {
+                val e = shadowExp[i]; val dy = shadowDys[i]
+                noImagesScrimPaint.color = Color.argb(shadowAlphas[i], 0, 0, 0)
+                canvas.drawRoundRect(left - e, top + dy - e,
+                                     right + e, bottom + dy + e,
+                                     radius + e, radius + e, noImagesScrimPaint)
+            }
+
+            // Store pill bounds for tap detection
+            pillRect.set(left, top, right, bottom)
+
+            // Pill background — Material You neutral surface color
+            val pillColor = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S)
+                resources.getColor(android.R.color.system_neutral1_800, null)
+            else
+                Color.argb(230, 40, 38, 46)
+            noImagesScrimPaint.color = pillColor
+            canvas.drawRoundRect(left, top, right, bottom, radius, radius, noImagesScrimPaint)
+
+            val baselineY = cy - (fm.ascent + fm.descent) / 2f
+            canvas.drawText(text, cx, baselineY, noImagesTextPaint)
         }
 
         private fun centerCropRect(bw: Int, bh: Int, dw: Int, dh: Int): Rect {
             if (dw <= 0 || dh <= 0) return Rect(0, 0, bw, bh)
-            val srcAspect = bw.toFloat() / bh
-            val dstAspect = dw.toFloat() / dh
+            val srcAspect = bw.toFloat() / bh; val dstAspect = dw.toFloat() / dh
             return if (srcAspect > dstAspect) {
-                val scaledW = (bh * dstAspect).toInt()
-                val xOff = (bw - scaledW) / 2
+                val scaledW = (bh * dstAspect).toInt(); val xOff = (bw - scaledW) / 2
                 Rect(xOff, 0, xOff + scaledW, bh)
             } else {
-                val scaledH = (bw / dstAspect).toInt()
-                val yOff = (bh - scaledH) / 2
+                val scaledH = (bw / dstAspect).toInt(); val yOff = (bh - scaledH) / 2
                 Rect(0, yOff, bw, yOff + scaledH)
             }
         }
 
         private fun recycleBitmaps() {
-            bitmaps.forEach { it?.recycle() }
-            bitmaps = emptyArray()
+            bitmaps.forEach { it?.recycle() }; bitmaps = emptyArray()
+            fadingBitmaps.forEach { it?.recycle() }; fadingBitmaps = emptyArray()
         }
     }
 }

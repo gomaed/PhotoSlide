@@ -14,6 +14,13 @@ PhotoSlide is an Android live wallpaper that turns your photo library into a dyn
 - **Slide interval** — photos cycle automatically at a configurable interval, or never
 - **Double-tap to advance** — tap any photo on the wallpaper to replace it immediately
 - **Spacing toggle** — add or remove gaps between photos in the grid
+- **Fading duration** — configure crossfade time between 0 ms (instant) and 1000 ms per photo swap
+- **Corner radius** — round photo corners from sharp to fully circular with fine-grained control
+- **Grid colour** — choose the background colour shown between images
+- **Material You theming** — header and status bar use your device's dynamic colour palette
+- **Placeholder grid** — four Material You tonal shades shown while no images are loaded
+- **Rescan button** — manually trigger a fresh folder scan from the Folders tab without restarting the wallpaper
+- **Tap to configure** — tap the "No Pictures Selected" pill on the wallpaper to jump straight to folder settings
 
 ## Screenshots
 
