@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.2] — 2026-04-02
+
+### Fixed
+- Animations (loading spinner and crossfade) no longer stop on Xiaomi/MIUI devices — replaced `ValueAnimator` (Choreographer-dependent) with `Handler.postDelayed` on the render thread, which is immune to system-level vsync throttling
+- Double-tap fade duration restored to fixed 200 ms regardless of the Fading Duration setting (interval advances still use the configured duration)
+- Picture selection is now stable across screen rotations — each orientation remembers its own selection including all advances made via double-tap or interval
+- Rotating the screen no longer resets the advance sequence to cell 0; the next cell to advance continues from where it left off
+- Rotation no longer causes a brief flicker of placeholder colours — old bitmaps are kept alive until new ones are decoded and swapped in atomically
+
 ## [1.1.1] — 2026-04-02
 
 ### Fixed

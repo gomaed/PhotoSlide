@@ -1,9 +1,5 @@
 package com.android.photoslide.wallpaper
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.ValueAnimator
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -16,13 +12,13 @@ import android.graphics.RectF
 import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.provider.DocumentsContract
 import android.service.wallpaper.WallpaperService
 import com.android.photoslide.data.ImageScanner
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.SurfaceHolder
-import android.view.animation.LinearInterpolator
 import com.android.photoslide.data.AppPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -129,7 +125,8 @@ class LiveWallpaperService : WallpaperService() {
         private var bitmaps: Array<Bitmap?> = emptyArray()
         private var fadingBitmaps: Array<Bitmap?> = emptyArray()
         private var fadeAlphas: FloatArray = FloatArray(0)
-        private var fadeAnimators: Array<ValueAnimator?> = emptyArray()
+        private var fadeStartTimes: LongArray = LongArray(0)
+        private var fadeDurations: LongArray = LongArray(0)
 
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         private val bgPaint = Paint()
@@ -154,8 +151,46 @@ class LiveWallpaperService : WallpaperService() {
         private var isLoading = false
         private var loadingRotation = 0f
         private var loadingSweep = 15f
-        private var rotationAnimator: ValueAnimator? = null
-        private var sweepAnimator: ValueAnimator? = null
+        private var loadingStep = 0
+
+        // Drives the loading spinner — runs on handlerThread, independent of Choreographer.
+        private val spinnerRunnable = object : Runnable {
+            override fun run() {
+                if (!isLoading) return
+                loadingRotation = (loadingRotation + 5f) % 360f
+                val step = loadingStep % 160
+                loadingSweep = if (step < 80) 15f + step * (265f / 80f)
+                               else 280f - (step - 80) * (265f / 80f)
+                loadingStep++
+                drawFrame()
+                handler.postDelayed(this, 16L)
+            }
+        }
+
+        // Drives crossfade animations — runs on handlerThread, independent of Choreographer.
+        private val fadeRunnable = object : Runnable {
+            override fun run() {
+                val now = SystemClock.uptimeMillis()
+                var anyActive = false
+                for (idx in fadeStartTimes.indices) {
+                    val start = fadeStartTimes[idx]
+                    if (start == 0L) continue
+                    val dur = fadeDurations[idx]
+                    val elapsed = now - start
+                    if (elapsed >= dur) {
+                        fadeAlphas[idx] = 1f
+                        fadeStartTimes[idx] = 0L
+                        fadingBitmaps[idx]?.recycle()
+                        fadingBitmaps[idx] = null
+                    } else {
+                        fadeAlphas[idx] = elapsed.toFloat() / dur
+                        anyActive = true
+                    }
+                }
+                drawFrame()
+                if (anyActive) handler.postDelayed(this, 16L)
+            }
+        }
 
         private val noImagesScrimPaint = Paint()
         private val noImagesTextPaint: Paint by lazy {
@@ -290,7 +325,6 @@ class LiveWallpaperService : WallpaperService() {
             handler.removeCallbacksAndMessages(null)
             handlerThread.quitSafely()
             scope.cancel()
-            fadeAnimators.forEach { it?.cancel() }
             recycleBitmaps()
             stopLoadingAnimation()
         }
@@ -311,6 +345,12 @@ class LiveWallpaperService : WallpaperService() {
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
+            // Persist the live cellIndices for the orientation we're leaving,
+            // while isLandscape still reflects the old orientation.
+            if (cellIndices.isNotEmpty()) {
+                if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
+                else portraitCellIndices = cellIndices.copyOf()
+            }
             surfaceWidth = width
             surfaceHeight = height
             if (this@LiveWallpaperService.images.isNotEmpty()) {
@@ -359,6 +399,7 @@ class LiveWallpaperService : WallpaperService() {
         private fun startLoading() {
             portraitCellIndices = IntArray(0)
             landscapeCellIndices = IntArray(0)
+            advanceCellPos = 0
             isLoading = true
             startLoadingAnimation()
             this@LiveWallpaperService.ensureImages(prefs) {
@@ -367,24 +408,13 @@ class LiveWallpaperService : WallpaperService() {
         }
 
         private fun startLoadingAnimation() {
-            rotationAnimator?.cancel(); sweepAnimator?.cancel()
-            rotationAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
-                duration = 900; repeatCount = ValueAnimator.INFINITE
-                repeatMode = ValueAnimator.RESTART; interpolator = LinearInterpolator()
-                addUpdateListener { loadingRotation = it.animatedValue as Float; drawFrame() }
-                start()
-            }
-            sweepAnimator = ValueAnimator.ofFloat(15f, 280f).apply {
-                duration = 1400; repeatCount = ValueAnimator.INFINITE
-                repeatMode = ValueAnimator.REVERSE; interpolator = AccelerateDecelerateInterpolator()
-                addUpdateListener { loadingSweep = it.animatedValue as Float }
-                start()
-            }
+            loadingRotation = 0f; loadingSweep = 15f; loadingStep = 0
+            handler.removeCallbacks(spinnerRunnable)
+            handler.post(spinnerRunnable)
         }
 
         private fun stopLoadingAnimation() {
-            rotationAnimator?.cancel(); sweepAnimator?.cancel()
-            rotationAnimator = null; sweepAnimator = null
+            handler.removeCallbacks(spinnerRunnable)
         }
 
         private suspend fun reloadAllBitmaps() {
@@ -403,7 +433,7 @@ class LiveWallpaperService : WallpaperService() {
             }
             if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
             else portraitCellIndices = cellIndices.copyOf()
-            advanceCellPos = 0
+            advanceCellPos = if (needed > 0) advanceCellPos % needed else 0
 
             // ③ Parallel decode — all cells decoded concurrently on the IO thread pool
             val newBitmaps = withContext(Dispatchers.IO) {
@@ -419,12 +449,13 @@ class LiveWallpaperService : WallpaperService() {
                 }
             }
 
-            fadeAnimators.forEach { it?.cancel() }
+            handler.removeCallbacks(fadeRunnable)
             val oldBitmaps = bitmaps; val oldFading = fadingBitmaps
             bitmaps = newBitmaps
             fadingBitmaps = Array(needed) { null }
             fadeAlphas = FloatArray(needed) { 1f }
-            fadeAnimators = Array(needed) { null }
+            fadeStartTimes = LongArray(needed) { 0L }
+            fadeDurations = LongArray(needed) { 0L }
             oldBitmaps.forEach { it?.recycle() }
             oldFading.forEach { it?.recycle() }
             isLoading = false
@@ -452,12 +483,13 @@ class LiveWallpaperService : WallpaperService() {
                 }
             }
 
-            fadeAnimators.forEach { it?.cancel() }
+            handler.removeCallbacks(fadeRunnable)
             val oldBitmaps = bitmaps; val oldFading = fadingBitmaps
             bitmaps = newBitmaps
             fadingBitmaps = Array(needed) { null }
             fadeAlphas = FloatArray(needed) { 1f }
-            fadeAnimators = Array(needed) { null }
+            fadeStartTimes = LongArray(needed) { 0L }
+            fadeDurations = LongArray(needed) { 0L }
             oldBitmaps.forEach { it?.recycle() }
             oldFading.forEach { it?.recycle() }
             if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
@@ -490,34 +522,23 @@ class LiveWallpaperService : WallpaperService() {
                 catch (_: Exception) { null }
             }
 
-            fadeAnimators[cellPos]?.cancel()
-
             if (fadeDuration <= 0L) {
                 fadingBitmaps[cellPos]?.recycle()
                 fadingBitmaps[cellPos] = null
                 bitmaps[cellPos]?.recycle()
                 bitmaps[cellPos] = newBitmap
                 fadeAlphas[cellPos] = 1f
-                fadeAnimators[cellPos] = null
+                fadeStartTimes[cellPos] = 0L
                 drawFrame()
             } else {
                 fadingBitmaps[cellPos]?.recycle()
                 fadingBitmaps[cellPos] = bitmaps[cellPos]
                 bitmaps[cellPos] = newBitmap
                 fadeAlphas[cellPos] = 0f
-
-                fadeAnimators[cellPos] = ValueAnimator.ofFloat(0f, 1f).apply {
-                    duration = fadeDuration; interpolator = LinearInterpolator()
-                    addUpdateListener { fadeAlphas[cellPos] = it.animatedValue as Float; drawFrame() }
-                    addListener(object : AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(animation: Animator) {
-                            fadingBitmaps[cellPos]?.recycle()
-                            fadingBitmaps[cellPos] = null
-                            fadeAlphas[cellPos] = 1f
-                        }
-                    })
-                    start()
-                }
+                fadeStartTimes[cellPos] = SystemClock.uptimeMillis()
+                fadeDurations[cellPos] = fadeDuration
+                handler.removeCallbacks(fadeRunnable)
+                handler.post(fadeRunnable)
             }
         }
 
