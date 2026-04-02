@@ -6,8 +6,8 @@ import android.animation.ValueAnimator
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.content.SharedPreferences
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.ImageDecoder
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
@@ -317,6 +317,14 @@ class LiveWallpaperService : WallpaperService() {
             }
         }
 
+        // Called by the system once the surface is stable and ready to draw —
+        // e.g. after rotation completes. Ensures the frame is painted even if
+        // lockHardwareCanvas() returned null during the surface transition.
+        override fun onSurfaceRedrawNeeded(holder: SurfaceHolder) {
+            super.onSurfaceRedrawNeeded(holder)
+            drawFrame()
+        }
+
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
             when (key) {
                 AppPreferences.KEY_FOLDER_URIS -> {
@@ -497,18 +505,23 @@ class LiveWallpaperService : WallpaperService() {
         }
 
         private fun decodeSampledBitmap(uri: Uri, reqWidth: Int, reqHeight: Int): Bitmap? {
-            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
-            opts.inSampleSize = calculateSampleSize(opts, reqWidth, reqHeight)
-            opts.inJustDecodeBounds = false
-            return contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+            return try {
+                val source = ImageDecoder.createSource(contentResolver, uri)
+                ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                    // info.size already reflects EXIF rotation — dimensions are correct orientation
+                    val sampleSize = calculateSampleSize(
+                        info.size.width, info.size.height, reqWidth, reqHeight
+                    )
+                    if (sampleSize > 1) decoder.setTargetSampleSize(sampleSize)
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                }
+            } catch (_: Exception) { null }
         }
 
-        private fun calculateSampleSize(opts: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
-            val h = opts.outHeight; val w = opts.outWidth
+        private fun calculateSampleSize(srcWidth: Int, srcHeight: Int, reqWidth: Int, reqHeight: Int): Int {
             var sampleSize = 1
-            if (h > reqHeight || w > reqWidth) {
-                val halfH = h / 2; val halfW = w / 2
+            if (srcHeight > reqHeight || srcWidth > reqWidth) {
+                val halfH = srcHeight / 2; val halfW = srcWidth / 2
                 while ((halfH / sampleSize) >= reqHeight && (halfW / sampleSize) >= reqWidth)
                     sampleSize *= 2
             }

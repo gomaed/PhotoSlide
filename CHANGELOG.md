@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.1] — 2026-04-02
+
+### Fixed
+- Grid no longer appears scrambled after screen rotation — `onSurfaceRedrawNeeded` now ensures the frame is redrawn once the surface is stable (affected tablets and some launchers)
+- Photos with EXIF rotation tags now display in the correct orientation on all devices — switched from `BitmapFactory` to `ImageDecoder` which auto-applies EXIF orientation
+
 ## [1.1] — 2026-04-01
 
 ### Added
