@@ -32,8 +32,8 @@
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp"
+        android:layout_marginStart="@dimen/content_padding_h"
+        android:layout_marginEnd="@dimen/content_padding_h"
         android:layout_marginBottom="48dp">
 
         <LinearLayout

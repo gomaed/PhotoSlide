@@ -102,19 +102,23 @@ class LayoutSelectFragment : Fragment() {
         inner class PageHolder(val recyclerView: RecyclerView) : RecyclerView.ViewHolder(recyclerView)
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageHolder {
+            val sidePad = parent.context.resources.getDimensionPixelSize(R.dimen.content_padding_h)
             val rv = RecyclerView(parent.context).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
-                setPadding(8.dpToPx(), 8.dpToPx(), 8.dpToPx(), 8.dpToPx())
+                setPadding(sidePad, 8.dpToPx(), sidePad, 8.dpToPx())
                 clipToPadding = false
             }
             return PageHolder(rv)
         }
 
         override fun onBindViewHolder(holder: PageHolder, position: Int) {
-            val gridCols = if (position == 0) 3 else 2
+            val gridCols = resources.getInteger(
+                if (position == 0) R.integer.layout_grid_cols_portrait
+                else R.integer.layout_grid_cols_landscape
+            )
             holder.recyclerView.layoutManager = GridLayoutManager(holder.recyclerView.context, gridCols)
             holder.recyclerView.adapter = when (position) {
                 0 -> portraitAdapter

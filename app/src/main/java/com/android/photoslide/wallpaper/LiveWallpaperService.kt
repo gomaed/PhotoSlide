@@ -195,7 +195,8 @@ class LiveWallpaperService : WallpaperService() {
                                 this@LiveWallpaperService,
                                 com.android.photoslide.ui.SettingsActivity::class.java
                             ).apply {
-                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                         android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
                                 putExtra("go_to_folders", true)
                             }
                             startActivity(intent)
@@ -616,7 +617,7 @@ class LiveWallpaperService : WallpaperService() {
 
         private fun drawLoadingPill(canvas: Canvas) {
             val text = this@LiveWallpaperService.getString(com.android.photoslide.R.string.loading)
-            noImagesTextPaint.textSize = surfaceWidth * 0.048f
+            noImagesTextPaint.textSize = 20f * resources.displayMetrics.scaledDensity
             val fm = noImagesTextPaint.fontMetrics
             val textW = noImagesTextPaint.measureText(text)
             val textH = fm.descent - fm.ascent
@@ -636,17 +637,6 @@ class LiveWallpaperService : WallpaperService() {
             val top = cy - pillH / 2f
             val right = cx + pillW / 2f
             val bottom = cy + pillH / 2f
-
-            // Shadow layers
-            val shadowAlphas = intArrayOf(18, 28, 40, 55)
-            val shadowDys   = floatArrayOf(10f, 7f, 5f, 3f)
-            val shadowExp   = floatArrayOf(10f, 7f, 4f, 1f)
-            for (i in shadowAlphas.indices) {
-                val e = shadowExp[i]; val dy = shadowDys[i]
-                noImagesScrimPaint.color = Color.argb(shadowAlphas[i], 0, 0, 0)
-                canvas.drawRoundRect(left - e, top + dy - e, right + e, bottom + dy + e,
-                                     radius + e, radius + e, noImagesScrimPaint)
-            }
 
             // Pill background
             val pillColor = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S)
@@ -675,7 +665,7 @@ class LiveWallpaperService : WallpaperService() {
 
         private fun drawNoImagesLabel(canvas: Canvas) {
             val text = this@LiveWallpaperService.getString(com.android.photoslide.R.string.no_pictures_selected)
-            noImagesTextPaint.textSize = surfaceWidth * 0.048f
+            noImagesTextPaint.textSize = 20f * resources.displayMetrics.scaledDensity
             val fm = noImagesTextPaint.fontMetrics
             val textW = noImagesTextPaint.measureText(text)
             val textH = fm.descent - fm.ascent
@@ -692,18 +682,6 @@ class LiveWallpaperService : WallpaperService() {
             val top = cy - pillH / 2f
             val right = cx + pillW / 2f
             val bottom = cy + pillH / 2f
-
-            // Simulated drop shadow — 4 layers (hardware canvas has no blur support)
-            val shadowAlphas = intArrayOf(18, 28, 40, 55)
-            val shadowDys   = floatArrayOf(10f, 7f, 5f, 3f)
-            val shadowExp   = floatArrayOf(10f, 7f, 4f, 1f)
-            for (i in shadowAlphas.indices) {
-                val e = shadowExp[i]; val dy = shadowDys[i]
-                noImagesScrimPaint.color = Color.argb(shadowAlphas[i], 0, 0, 0)
-                canvas.drawRoundRect(left - e, top + dy - e,
-                                     right + e, bottom + dy + e,
-                                     radius + e, radius + e, noImagesScrimPaint)
-            }
 
             // Store pill bounds for tap detection
             pillRect.set(left, top, right, bottom)

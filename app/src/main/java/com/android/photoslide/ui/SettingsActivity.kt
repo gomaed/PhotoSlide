@@ -1,5 +1,6 @@
 package com.android.photoslide.ui
 
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.os.Bundle
@@ -43,6 +44,16 @@ class SettingsActivity : AppCompatActivity() {
 
         binding.bottomNavigation.setupWithNavController(navController)
 
+        goToFoldersIfRequested(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        goToFoldersIfRequested(intent)
+    }
+
+    private fun goToFoldersIfRequested(intent: android.content.Intent) {
         if (intent.getBooleanExtra("go_to_folders", false)) {
             binding.bottomNavigation.selectedItemId = R.id.folderSelectFragment
         }

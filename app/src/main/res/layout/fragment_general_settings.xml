@@ -13,8 +13,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp"
-            android:paddingBottom="96dp">
+            android:paddingTop="16dp"
+            android:paddingBottom="96dp"
+            android:paddingStart="@dimen/content_padding_h"
+            android:paddingEnd="@dimen/content_padding_h">
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
