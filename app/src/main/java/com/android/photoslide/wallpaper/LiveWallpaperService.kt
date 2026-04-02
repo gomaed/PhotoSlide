@@ -123,6 +123,8 @@ class LiveWallpaperService : WallpaperService() {
         private val prefs by lazy { AppPreferences(this@LiveWallpaperService) }
 
         private var cellIndices: IntArray = IntArray(0)
+        private var portraitCellIndices: IntArray = IntArray(0)
+        private var landscapeCellIndices: IntArray = IntArray(0)
         private var advanceCellPos = 0
         private var bitmaps: Array<Bitmap?> = emptyArray()
         private var fadingBitmaps: Array<Bitmap?> = emptyArray()
@@ -355,6 +357,8 @@ class LiveWallpaperService : WallpaperService() {
 
         // Start the loading sequence: show spinner, then decode once images are ready.
         private fun startLoading() {
+            portraitCellIndices = IntArray(0)
+            landscapeCellIndices = IntArray(0)
             isLoading = true
             startLoadingAnimation()
             this@LiveWallpaperService.ensureImages(prefs) {
@@ -389,10 +393,16 @@ class LiveWallpaperService : WallpaperService() {
             val rects = cellRects()
             val needed = rects.size
 
-            val step = if (imgs.size > needed) imgs.size / needed else 1
-            cellIndices = IntArray(needed) { i ->
-                if (imgs.isEmpty()) 0 else (i * step) % imgs.size
+            val saved = if (isLandscape) landscapeCellIndices else portraitCellIndices
+            cellIndices = if (saved.size == needed && imgs.isNotEmpty()) {
+                saved.copyOf()
+            } else {
+                val step = if (imgs.size > needed) imgs.size / needed else 1
+                val offset = if (imgs.isEmpty()) 0 else (0 until imgs.size).random()
+                IntArray(needed) { i -> if (imgs.isEmpty()) 0 else (offset + i * step) % imgs.size }
             }
+            if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
+            else portraitCellIndices = cellIndices.copyOf()
             advanceCellPos = 0
 
             // ③ Parallel decode — all cells decoded concurrently on the IO thread pool
@@ -410,11 +420,13 @@ class LiveWallpaperService : WallpaperService() {
             }
 
             fadeAnimators.forEach { it?.cancel() }
-            recycleBitmaps()
+            val oldBitmaps = bitmaps; val oldFading = fadingBitmaps
             bitmaps = newBitmaps
             fadingBitmaps = Array(needed) { null }
             fadeAlphas = FloatArray(needed) { 1f }
             fadeAnimators = Array(needed) { null }
+            oldBitmaps.forEach { it?.recycle() }
+            oldFading.forEach { it?.recycle() }
             isLoading = false
             stopLoadingAnimation()
             drawFrame()
@@ -441,11 +453,15 @@ class LiveWallpaperService : WallpaperService() {
             }
 
             fadeAnimators.forEach { it?.cancel() }
-            recycleBitmaps()
+            val oldBitmaps = bitmaps; val oldFading = fadingBitmaps
             bitmaps = newBitmaps
             fadingBitmaps = Array(needed) { null }
             fadeAlphas = FloatArray(needed) { 1f }
             fadeAnimators = Array(needed) { null }
+            oldBitmaps.forEach { it?.recycle() }
+            oldFading.forEach { it?.recycle() }
+            if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
+            else portraitCellIndices = cellIndices.copyOf()
             drawFrame()
         }
 
