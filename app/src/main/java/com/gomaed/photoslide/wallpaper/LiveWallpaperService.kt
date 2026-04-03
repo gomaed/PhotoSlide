@@ -654,7 +654,7 @@ class LiveWallpaperService : WallpaperService() {
 
         private fun drawLoadingPill(canvas: Canvas) {
             val text = this@LiveWallpaperService.getString(com.gomaed.photoslide.R.string.loading)
-            noImagesTextPaint.textSize = 20f * resources.displayMetrics.scaledDensity
+            noImagesTextPaint.textSize = 20f * resources.displayMetrics.density * resources.configuration.fontScale
             val fm = noImagesTextPaint.fontMetrics
             val textW = noImagesTextPaint.measureText(text)
             val textH = fm.descent - fm.ascent
@@ -702,7 +702,7 @@ class LiveWallpaperService : WallpaperService() {
 
         private fun drawNoImagesLabel(canvas: Canvas) {
             val text = this@LiveWallpaperService.getString(com.gomaed.photoslide.R.string.no_pictures_selected)
-            noImagesTextPaint.textSize = 20f * resources.displayMetrics.scaledDensity
+            noImagesTextPaint.textSize = 20f * resources.displayMetrics.density * resources.configuration.fontScale
             val fm = noImagesTextPaint.fontMetrics
             val textW = noImagesTextPaint.measureText(text)
             val textH = fm.descent - fm.ascent
