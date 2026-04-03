@@ -7,17 +7,17 @@
 
     <fragment
         android:id="@+id/folderSelectFragment"
-        android:name="com.android.photoslide.ui.folders.FolderSelectFragment"
+        android:name="com.gomaed.photoslide.ui.folders.FolderSelectFragment"
         android:label="@string/nav_folders" />
 
     <fragment
         android:id="@+id/layoutSelectFragment"
-        android:name="com.android.photoslide.ui.layout.LayoutSelectFragment"
+        android:name="com.gomaed.photoslide.ui.layout.LayoutSelectFragment"
         android:label="@string/nav_layout" />
 
     <fragment
         android:id="@+id/generalSettingsFragment"
-        android:name="com.android.photoslide.ui.settings.GeneralSettingsFragment"
+        android:name="com.gomaed.photoslide.ui.settings.GeneralSettingsFragment"
         android:label="@string/nav_settings_title" />
 
 </navigation>

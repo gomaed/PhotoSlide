@@ -1,9 +1,9 @@
-package com.android.photoslide.ui.layout
+package com.gomaed.photoslide.ui.layout
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.android.photoslide.databinding.ItemLayoutOptionBinding
+import com.gomaed.photoslide.databinding.ItemLayoutOptionBinding
 
 class LayoutOptionAdapter(
     private val options: List<GridOption>,

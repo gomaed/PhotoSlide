@@ -14,7 +14,7 @@
         android:orientation="vertical"
         android:padding="10dp">
 
-        <com.android.photoslide.ui.layout.GridPreviewView
+        <com.gomaed.photoslide.ui.layout.GridPreviewView
             android:id="@+id/grid_preview"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />

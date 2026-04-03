@@ -1,4 +1,4 @@
-package com.android.photoslide.ui.folders
+package com.gomaed.photoslide.ui.folders
 
 import android.net.Uri
 

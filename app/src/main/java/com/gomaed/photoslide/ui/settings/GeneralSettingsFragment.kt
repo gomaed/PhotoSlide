@@ -1,4 +1,4 @@
-package com.android.photoslide.ui.settings
+package com.gomaed.photoslide.ui.settings
 
 import android.app.WallpaperManager
 import android.content.ComponentName
@@ -14,10 +14,10 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.GridLayout
 import androidx.fragment.app.Fragment
-import com.android.photoslide.R
-import com.android.photoslide.data.AppPreferences
-import com.android.photoslide.databinding.FragmentGeneralSettingsBinding
-import com.android.photoslide.wallpaper.LiveWallpaperService
+import com.gomaed.photoslide.R
+import com.gomaed.photoslide.data.AppPreferences
+import com.gomaed.photoslide.databinding.FragmentGeneralSettingsBinding
+import com.gomaed.photoslide.wallpaper.LiveWallpaperService
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class GeneralSettingsFragment : Fragment() {

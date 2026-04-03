@@ -1,4 +1,4 @@
-package com.android.photoslide.ui.folders
+package com.gomaed.photoslide.ui.folders
 
 import android.content.Intent
 import android.net.Uri
@@ -11,9 +11,9 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.android.photoslide.data.AppPreferences
-import com.android.photoslide.data.ImageScanner
-import com.android.photoslide.databinding.FragmentFolderSelectBinding
+import com.gomaed.photoslide.data.AppPreferences
+import com.gomaed.photoslide.data.ImageScanner
+import com.gomaed.photoslide.databinding.FragmentFolderSelectBinding
 import kotlinx.coroutines.launch
 
 class FolderSelectFragment : Fragment() {

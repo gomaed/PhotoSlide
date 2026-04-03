@@ -1,4 +1,4 @@
-package com.android.photoslide.wallpaper
+package com.gomaed.photoslide.wallpaper
 
 import android.content.SharedPreferences
 import android.graphics.Bitmap
@@ -15,11 +15,11 @@ import android.os.HandlerThread
 import android.os.SystemClock
 import android.provider.DocumentsContract
 import android.service.wallpaper.WallpaperService
-import com.android.photoslide.data.ImageScanner
+import com.gomaed.photoslide.data.ImageScanner
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.SurfaceHolder
-import com.android.photoslide.data.AppPreferences
+import com.gomaed.photoslide.data.AppPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -196,7 +196,7 @@ class LiveWallpaperService : WallpaperService() {
         private val noImagesTextPaint: Paint by lazy {
             val ctx = android.view.ContextThemeWrapper(
                 this@LiveWallpaperService,
-                com.android.photoslide.R.style.Theme_PhotoSlide
+                com.gomaed.photoslide.R.style.Theme_PhotoSlide
             )
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 typeface = android.graphics.Typeface.create(
@@ -230,7 +230,7 @@ class LiveWallpaperService : WallpaperService() {
                         if (images.isEmpty() && pillRect.contains(e.x, e.y)) {
                             val intent = android.content.Intent(
                                 this@LiveWallpaperService,
-                                com.android.photoslide.ui.SettingsActivity::class.java
+                                com.gomaed.photoslide.ui.SettingsActivity::class.java
                             ).apply {
                                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                                          android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -653,7 +653,7 @@ class LiveWallpaperService : WallpaperService() {
         }
 
         private fun drawLoadingPill(canvas: Canvas) {
-            val text = this@LiveWallpaperService.getString(com.android.photoslide.R.string.loading)
+            val text = this@LiveWallpaperService.getString(com.gomaed.photoslide.R.string.loading)
             noImagesTextPaint.textSize = 20f * resources.displayMetrics.scaledDensity
             val fm = noImagesTextPaint.fontMetrics
             val textW = noImagesTextPaint.measureText(text)
@@ -701,7 +701,7 @@ class LiveWallpaperService : WallpaperService() {
         }
 
         private fun drawNoImagesLabel(canvas: Canvas) {
-            val text = this@LiveWallpaperService.getString(com.android.photoslide.R.string.no_pictures_selected)
+            val text = this@LiveWallpaperService.getString(com.gomaed.photoslide.R.string.no_pictures_selected)
             noImagesTextPaint.textSize = 20f * resources.displayMetrics.scaledDensity
             val fm = noImagesTextPaint.fontMetrics
             val textW = noImagesTextPaint.measureText(text)

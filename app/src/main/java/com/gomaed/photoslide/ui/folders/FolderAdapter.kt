@@ -1,4 +1,4 @@
-package com.android.photoslide.ui.folders
+package com.gomaed.photoslide.ui.folders
 
 import android.net.Uri
 import android.view.LayoutInflater
@@ -6,7 +6,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.android.photoslide.databinding.ItemFolderBinding
+import com.gomaed.photoslide.databinding.ItemFolderBinding
 
 class FolderAdapter(private val onDelete: (Uri) -> Unit) :
     ListAdapter<FolderItem, FolderAdapter.ViewHolder>(DiffCallback()) {

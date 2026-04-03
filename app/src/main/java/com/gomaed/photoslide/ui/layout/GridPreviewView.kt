@@ -1,4 +1,4 @@
-package com.android.photoslide.ui.layout
+package com.gomaed.photoslide.ui.layout
 
 import android.content.Context
 import android.graphics.Canvas

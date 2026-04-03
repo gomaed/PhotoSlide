@@ -1,4 +1,4 @@
-package com.android.photoslide
+package com.gomaed.photoslide
 
 import org.junit.Test
 

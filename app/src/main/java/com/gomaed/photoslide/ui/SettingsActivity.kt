@@ -1,4 +1,4 @@
-package com.android.photoslide.ui
+package com.gomaed.photoslide.ui
 
 import android.content.Intent
 import android.content.SharedPreferences
@@ -9,9 +9,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
-import com.android.photoslide.R
-import com.android.photoslide.data.AppPreferences
-import com.android.photoslide.databinding.ActivitySettingsBinding
+import com.gomaed.photoslide.R
+import com.gomaed.photoslide.data.AppPreferences
+import com.gomaed.photoslide.databinding.ActivitySettingsBinding
 
 class SettingsActivity : AppCompatActivity() {
 

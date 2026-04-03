@@ -1,4 +1,4 @@
-package com.android.photoslide.data
+package com.gomaed.photoslide.data
 
 import android.content.Context
 import android.content.SharedPreferences

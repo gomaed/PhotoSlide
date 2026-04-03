@@ -1,4 +1,4 @@
-package com.android.photoslide.ui.layout
+package com.gomaed.photoslide.ui.layout
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -8,9 +8,9 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
-import com.android.photoslide.R
-import com.android.photoslide.data.AppPreferences
-import com.android.photoslide.databinding.FragmentLayoutSelectBinding
+import com.gomaed.photoslide.R
+import com.gomaed.photoslide.data.AppPreferences
+import com.gomaed.photoslide.databinding.FragmentLayoutSelectBinding
 import com.google.android.material.tabs.TabLayoutMediator
 
 class LayoutSelectFragment : Fragment() {

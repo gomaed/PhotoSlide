@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.android.photoslide"
+    namespace = "com.gomaed.photoslide"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -11,7 +11,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.android.photoslide"
+        applicationId = "com.gomaed.photoslide"
         minSdk = 29
         targetSdk = 36
         versionCode = 4

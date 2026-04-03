@@ -1,3 +1,3 @@
-package com.android.photoslide.ui.layout
+package com.gomaed.photoslide.ui.layout
 
 data class GridOption(val cols: Int, val rows: Int)
