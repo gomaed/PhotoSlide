@@ -1,8 +1,8 @@
-<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="80" align="left" hspace="12"/>
-
 # PhotoSlide
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="80" align="left" hspace="12"/>
 
 PhotoSlide is an Android live wallpaper that turns your photo library into a dynamic, tiled wallpaper. Pick folders from your device, choose a grid layout, and let your pictures fill the screen — automatically sliding to fresh ones at your chosen interval.
 
