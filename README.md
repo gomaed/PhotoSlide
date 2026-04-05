@@ -1,8 +1,12 @@
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="80" align="left" hspace="12"/>
+
 # PhotoSlide
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 PhotoSlide is an Android live wallpaper that turns your photo library into a dynamic, tiled wallpaper. Pick folders from your device, choose a grid layout, and let your pictures fill the screen — automatically sliding to fresh ones at your chosen interval.
+
+<br clear="left"/>
 
 ## Features
 
@@ -24,12 +28,15 @@ PhotoSlide is an Android live wallpaper that turns your photo library into a dyn
 
 ## Screenshots
 
-<p float="left">
-  <img src="Screenshots/Screenshot_20260326-154033.png" width="180" alt="Live Wallpaper"/>
-  <img src="Screenshots/Screenshot_20260326-153819.png" width="180" alt="Settings"/>
-  <img src="Screenshots/Screenshot_20260326-153830.png" width="180" alt="Layout Selection"/>
-  <img src="Screenshots/Screenshot_20260326-153918.png" width="180" alt="Folder Selection"/>
-</p>
+<table>
+  <tr>
+    <td><img src="Screenshots/Screenshot_20260404-174113.png" width="150" alt="Live Wallpaper"/></td>
+    <td><img src="Screenshots/Screenshot_20260404-174324.png" width="150" alt="Live Wallpaper 2"/></td>
+    <td><img src="Screenshots/Screenshot_20260404-173857.png" width="150" alt="Settings"/></td>
+    <td><img src="Screenshots/Screenshot_20260404-173908.png" width="150" alt="Layout Selection"/></td>
+    <td><img src="Screenshots/Screenshot_20260404-174026.png" width="150" alt="Folder Selection"/></td>
+  </tr>
+</table>
 
 ## Requirements
 
