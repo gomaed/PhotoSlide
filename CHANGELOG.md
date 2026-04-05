@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.3] — 2026-04-05
+
+### Fixed
+- Package renamed from `com.android.photoslide` to `com.gomaed.photoslide` for Play Store compatibility
+- Replaced deprecated `scaledDensity` with `density × fontScale` to resolve API 34 deprecation warning
+
 ## [1.1.2] — 2026-04-02
 
 ### Fixed
