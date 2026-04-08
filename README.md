@@ -21,6 +21,8 @@ PhotoSlide is an Android live wallpaper that turns your photo library into a dyn
 - **Fading duration** — configure crossfade time between 0 ms (instant) and 1000 ms per photo swap
 - **Corner radius** — round photo corners from sharp to fully circular with fine-grained control
 - **Grid colour** — choose the background colour shown between images
+- **Light & dark mode** — fully supports system-wide light and dark theme
+- **No permissions required** — uses Android's Storage Access Framework; no storage permissions needed
 - **Material You theming** — header and status bar use your device's dynamic colour palette
 - **Placeholder grid** — four Material You tonal shades shown while no images are loaded
 - **Rescan button** — manually trigger a fresh folder scan from the Folders tab without restarting the wallpaper
