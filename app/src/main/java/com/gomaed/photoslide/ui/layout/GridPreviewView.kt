@@ -20,6 +20,9 @@ class GridPreviewView @JvmOverloads constructor(
     var rows: Int = 2
         set(value) { field = value; invalidate() }
 
+    var staggerRatio: Int = 50
+        set(value) { field = value; invalidate() }
+
     var isLandscape: Boolean = false
         set(value) { field = value; requestLayout() }
 
@@ -44,19 +47,37 @@ private val cellPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (width == 0 || height == 0) return
+        if (width == 0 || height == 0 || cols == 0 || rows == 0) return
 
-        if (cols == 0 || rows == 0) return
         val totalDivW = dividerSize * (cols - 1)
         val totalDivH = dividerSize * (rows - 1)
         val cellW = (width - totalDivW) / cols
-        val cellH = (height - totalDivH) / rows
+        val availH = height - totalDivH
+        val ratio = staggerRatio / 100f
 
-        for (row in 0 until rows) {
+        if (ratio <= 0.5f || rows <= 1 || cols <= 1) {
+            val cellH = availH / rows
+            for (row in 0 until rows) {
+                for (col in 0 until cols) {
+                    val left = col * (cellW + dividerSize)
+                    val top = row * (cellH + dividerSize)
+                    canvas.drawRect(left, top, left + cellW, top + cellH, cellPaint)
+                }
+            }
+        } else {
             for (col in 0 until cols) {
+                val tallCount = (0 until rows).count { row -> (row + col) % 2 == 0 }
+                val shortCount = rows - tallCount
+                val k = availH / (tallCount * ratio + shortCount * (1f - ratio))
+                val tallH = ratio * k
+                val shortH = (1f - ratio) * k
                 val left = col * (cellW + dividerSize)
-                val top = row * (cellH + dividerSize)
-                canvas.drawRect(left, top, left + cellW, top + cellH, cellPaint)
+                var top = 0f
+                for (row in 0 until rows) {
+                    val cellH = if ((row + col) % 2 == 0) tallH else shortH
+                    canvas.drawRect(left, top, left + cellW, top + cellH, cellPaint)
+                    top += cellH + dividerSize
+                }
             }
         }
     }

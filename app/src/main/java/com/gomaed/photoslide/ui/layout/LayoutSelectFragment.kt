@@ -64,7 +64,7 @@ class LayoutSelectFragment : Fragment() {
             portraitCols = option.cols
             portraitRows = option.rows
             updateStaggerEnabled()
-        }
+        }.also { it.staggerRatio = prefs.staggerRatio }
 
         landscapeAdapter = LayoutOptionAdapter(
             gridOptions,
@@ -76,7 +76,7 @@ class LayoutSelectFragment : Fragment() {
             landscapeRows = option.rows
             landscapeCols = option.cols
             updateStaggerEnabled()
-        }
+        }.also { it.staggerRatio = prefs.staggerRatio }
 
         binding.viewPager.adapter = LayoutPagerAdapter()
 
@@ -146,6 +146,8 @@ class LayoutSelectFragment : Fragment() {
             val ratio = value.toInt()
             prefs.staggerRatio = ratio
             binding.staggerLabel.text = staggerLabel(ratio)
+            portraitAdapter.staggerRatio = ratio
+            landscapeAdapter.staggerRatio = ratio
         }
     }
 
@@ -162,7 +164,7 @@ class LayoutSelectFragment : Fragment() {
 
     private fun staggerLabel(ratio: Int): String {
         return if (ratio <= 50) getString(R.string.stagger_none)
-        else "$ratio/${100 - ratio}"
+        else "${2 * (ratio - 50)}%"
     }
 
     override fun onDestroyView() {

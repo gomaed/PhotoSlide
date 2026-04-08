@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PhotoSlide</string>
+    <string name="wallpaper_description">Zeigt Fotos aus deinen ausgewählten Ordnern in einem Raster an</string>
+    <string name="settings_title">PhotoSlide Einstellungen</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_folders">Ordner</string>
+    <string name="nav_layout">Layout</string>
+    <string name="nav_settings_title">Einstellungen</string>
+
+    <!-- Folder select -->
+    <string name="no_folders_selected">Keine Ordner ausgewählt.\nTippe auf +, um einen Ordner hinzuzufügen.</string>
+    <string name="add_folder">Hinzufügen</string>
+    <string name="rescan_folders">Neu scannen</string>
+    <string name="scanning_folders">Lade…</string>
+    <string name="no_pictures_selected">Keine Bilder ausgewählt</string>
+    <string name="loading">Lade…</string>
+    <string name="remove_folder">Ordner entfernen</string>
+
+    <!-- Layout select -->
+    <string name="portrait">Hochformat</string>
+    <string name="landscape">Querformat</string>
+    <string name="stagger">Versatz</string>
+    <string name="stagger_none">Aus</string>
+
+    <!-- General settings -->
+    <string name="slide_interval">Wechsel-Intervall</string>
+    <string name="picture_fade_time">Überblendungsdauer</string>
+    <string name="fade_off">Aus</string>
+    <string name="sort_order">Sortierreihenfolge</string>
+    <string name="sort_name_asc">Name (A\u2013Z)</string>
+    <string name="sort_date_desc">Datum (Neueste zuerst)</string>
+    <string name="sort_random">Zufällig</string>
+    <string name="grid_appearance">Raster-Darstellung</string>
+    <string name="grid_width">Rasterbreite</string>
+    <string name="grid_width_off">Aus</string>
+    <string name="interval_5s">5 Sekunden</string>
+    <string name="interval_10s">10 Sekunden</string>
+    <string name="interval_30s">30 Sekunden</string>
+    <string name="interval_1min">1 Minute</string>
+    <string name="interval_5min">5 Minuten</string>
+    <string name="interval_15min">15 Minuten</string>
+    <string name="interval_30min">30 Minuten</string>
+    <string name="interval_1h">1 Stunde</string>
+    <string name="interval_6h">6 Stunden</string>
+    <string name="interval_12h">12 Stunden</string>
+    <string name="interval_24h">24 Stunden</string>
+    <string name="interval_never">Nie</string>
+    <string name="set_wallpaper">Hintergrundbild festlegen</string>
+    <string name="double_tap_advance">Bild bei Doppeltippen wechseln</string>
+    <string name="double_tap_advance_desc">Doppeltippe auf ein Bild, um es sofort zu ersetzen</string>
+    <string name="grid_corner_radius">Eckradius</string>
+    <string name="grid_color">Rasterfarbe</string>
+    <string name="grid_color_desc">Hintergrundfarbe zwischen den Bildern</string>
+    <string name="grid_color_picker_title">Rasterfarbe wählen</string>
+</resources>

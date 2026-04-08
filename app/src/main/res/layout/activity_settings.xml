@@ -44,7 +44,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="Scanning..."
+                    android:text="@string/scanning_folders"
                     android:textAppearance="?attr/textAppearanceLabelSmall"
                     android:textColor="?attr/colorOnPrimaryContainer"
                     android:fontFamily="?attr/fontFamily" />
