@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.4] — 2026-04-10
+
+### Added
+- German (de) translations for all UI strings
+- Grid layout previews now update live when adjusting the stagger slider
+- Stagger value now displayed as a visual percentage instead of a raw ratio
+
+### Fixed
+- "Scanning…" label in the toolbar was hardcoded and not translated
+- Checkmark flicker in layout previews when moving the stagger slider
+
 ## [1.1.3] — 2026-04-05
 
 ### Fixed
