@@ -32,6 +32,7 @@ class AppPreferences(context: Context) {
         const val KEY_GRID_CORNER_RADIUS = "grid_corner_radius"
         const val KEY_IS_SCANNING = "is_scanning"
         const val KEY_FADE_DURATION = "fade_duration"
+        const val KEY_KEN_BURNS = "ken_burns"
     }
 
     var selectedFolderUris: Set<String>
@@ -91,6 +92,10 @@ class AppPreferences(context: Context) {
     var staggerRatio: Int
         get() = prefs.getInt(KEY_STAGGER_RATIO, 55)
         set(value) { prefs.edit().putInt(KEY_STAGGER_RATIO, value).apply() }
+
+    var kenBurnsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_KEN_BURNS, false)
+        set(value) { prefs.edit().putBoolean(KEY_KEN_BURNS, value).apply() }
 
     fun registerChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
         prefs.registerOnSharedPreferenceChangeListener(listener)

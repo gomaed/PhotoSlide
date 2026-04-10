@@ -54,4 +54,6 @@
     <string name="grid_color">Grid Color</string>
     <string name="grid_color_desc">Background color shown between images</string>
     <string name="grid_color_picker_title">Choose Grid Color</string>
+    <string name="ken_burns">Ken Burns Effect</string>
+    <string name="ken_burns_desc">Slowly pan and zoom each photo while it is displayed</string>
 </resources>

@@ -33,6 +33,17 @@ import kotlinx.coroutines.withContext
 
 class LiveWallpaperService : WallpaperService() {
 
+    companion object {
+        private const val KB_DURATION_MS = 20_000f
+    }
+
+    private data class KenBurnsState(
+        val startScale: Float, val endScale: Float,
+        val startPanX: Float, val startPanY: Float,
+        val endPanX: Float, val endPanY: Float,
+        val startTime: Long
+    )
+
     // ── Service-level image pool ──────────────────────────────────────────────
     // Shared across all engine instances (homescreen + preview).
     // @Volatile so the HandlerThread in each engine sees the latest reference.
@@ -118,6 +129,40 @@ class LiveWallpaperService : WallpaperService() {
         private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
         private val prefs by lazy { AppPreferences(this@LiveWallpaperService) }
 
+        private var kenBurnsStates: Array<KenBurnsState?> = emptyArray()
+        private var fadingKenBurnsStates: Array<KenBurnsState?> = emptyArray()
+
+        private val kenBurnsRunnable = object : Runnable {
+            override fun run() {
+                if (!prefs.kenBurnsEnabled || !isVisible) return
+                drawFrame()
+                handler.postDelayed(this, 33L)
+            }
+        }
+
+        private fun startKenBurns() {
+            handler.removeCallbacks(kenBurnsRunnable)
+            handler.post(kenBurnsRunnable)
+        }
+
+        private fun stopKenBurns() {
+            handler.removeCallbacks(kenBurnsRunnable)
+        }
+
+        private fun randomKenBurnsState(): KenBurnsState {
+            val r = java.util.Random()
+            val minScale = 1.0f; val maxScale = 1.2f
+            return KenBurnsState(
+                startScale = minScale + r.nextFloat() * (maxScale - minScale),
+                endScale   = minScale + r.nextFloat() * (maxScale - minScale),
+                startPanX  = r.nextFloat() * 2f - 1f,
+                startPanY  = r.nextFloat() * 2f - 1f,
+                endPanX    = r.nextFloat() * 2f - 1f,
+                endPanY    = r.nextFloat() * 2f - 1f,
+                startTime  = SystemClock.uptimeMillis()
+            )
+        }
+
         private var cellIndices: IntArray = IntArray(0)
         private var portraitCellIndices: IntArray = IntArray(0)
         private var landscapeCellIndices: IntArray = IntArray(0)
@@ -182,6 +227,7 @@ class LiveWallpaperService : WallpaperService() {
                         fadeStartTimes[idx] = 0L
                         fadingBitmaps[idx]?.recycle()
                         fadingBitmaps[idx] = null
+                        if (idx < fadingKenBurnsStates.size) fadingKenBurnsStates[idx] = null
                     } else {
                         fadeAlphas[idx] = elapsed.toFloat() / dur
                         anyActive = true
@@ -327,6 +373,7 @@ class LiveWallpaperService : WallpaperService() {
             scope.cancel()
             recycleBitmaps()
             stopLoadingAnimation()
+            stopKenBurns()
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
@@ -338,8 +385,10 @@ class LiveWallpaperService : WallpaperService() {
                     scope.launch { refreshBitmaps() }
                 }
                 scheduleNextAdvance()
+                if (prefs.kenBurnsEnabled) startKenBurns()
             } else {
                 handler.removeCallbacks(advanceRunnable)
+                stopKenBurns()
             }
         }
 
@@ -388,6 +437,16 @@ class LiveWallpaperService : WallpaperService() {
                 AppPreferences.KEY_GRID_SPACING,
                 AppPreferences.KEY_GRID_COLOR,
                 AppPreferences.KEY_GRID_CORNER_RADIUS -> drawFrame()
+
+                AppPreferences.KEY_KEN_BURNS -> {
+                    if (prefs.kenBurnsEnabled) {
+                        kenBurnsStates = Array(cellIndices.size) { randomKenBurnsState() }
+                        if (isVisible) startKenBurns()
+                    } else {
+                        stopKenBurns()
+                        drawFrame()
+                    }
+                }
 
                 AppPreferences.KEY_SLIDE_INTERVAL -> {
                     if (isVisible) scheduleNextAdvance()
@@ -458,8 +517,11 @@ class LiveWallpaperService : WallpaperService() {
             fadeDurations = LongArray(needed) { 0L }
             oldBitmaps.forEach { it?.recycle() }
             oldFading.forEach { it?.recycle() }
+            kenBurnsStates = Array(needed) { randomKenBurnsState() }
+            fadingKenBurnsStates = Array(needed) { null }
             isLoading = false
             stopLoadingAnimation()
+            if (prefs.kenBurnsEnabled && isVisible) startKenBurns()
             drawFrame()
         }
 
@@ -492,6 +554,9 @@ class LiveWallpaperService : WallpaperService() {
             fadeDurations = LongArray(needed) { 0L }
             oldBitmaps.forEach { it?.recycle() }
             oldFading.forEach { it?.recycle() }
+            kenBurnsStates = Array(needed) { randomKenBurnsState() }
+            fadingKenBurnsStates = Array(needed) { null }
+            if (prefs.kenBurnsEnabled && isVisible) startKenBurns()
             if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
             else portraitCellIndices = cellIndices.copyOf()
             drawFrame()
@@ -520,6 +585,34 @@ class LiveWallpaperService : WallpaperService() {
             val newBitmap = withContext(Dispatchers.IO) {
                 try { decodeSampledBitmap(imgs[imageIdx], r.width().toInt(), r.height().toInt()) }
                 catch (_: Exception) { null }
+            }
+
+            if (cellPos < kenBurnsStates.size) {
+                // Freeze outgoing bitmap's current KB position so the crossfade is smooth
+                val currentState = kenBurnsStates[cellPos]
+                if (currentState != null && prefs.kenBurnsEnabled && cellPos < fadingKenBurnsStates.size) {
+                    val elapsed = (SystemClock.uptimeMillis() - currentState.startTime).toFloat()
+                    val t = (elapsed / KB_DURATION_MS).coerceIn(0f, 1f)
+                    val frozenScale = lerp(currentState.startScale, currentState.endScale, t)
+                    val frozenPanX  = lerp(currentState.startPanX, currentState.endPanX, t)
+                    val frozenPanY  = lerp(currentState.startPanY, currentState.endPanY, t)
+                    fadingKenBurnsStates[cellPos] = KenBurnsState(
+                        startScale = frozenScale, endScale = frozenScale,
+                        startPanX = frozenPanX, startPanY = frozenPanY,
+                        endPanX = frozenPanX, endPanY = frozenPanY,
+                        startTime = SystemClock.uptimeMillis()
+                    )
+                }
+                // New bitmap starts from neutral center and slowly drifts outward
+                val r = java.util.Random()
+                kenBurnsStates[cellPos] = KenBurnsState(
+                    startScale = 1.0f,
+                    endScale   = 1.0f + r.nextFloat() * 0.2f,
+                    startPanX  = 0f, startPanY = 0f,
+                    endPanX    = r.nextFloat() * 2f - 1f,
+                    endPanY    = r.nextFloat() * 2f - 1f,
+                    startTime  = SystemClock.uptimeMillis()
+                )
             }
 
             if (fadeDuration <= 0L) {
@@ -602,25 +695,38 @@ class LiveWallpaperService : WallpaperService() {
                     canvas.clipPath(Path().apply {
                         addRoundRect(dest, floatArrayOf(tlR, tlR, trR, trR, brR, brR, blR, blR), Path.Direction.CW)
                     })
+                } else if (prefs.kenBurnsEnabled) {
+                    canvas.clipRect(dest)
                 }
 
                 val alpha = fadeAlphas.getOrElse(idx) { 1f }
                 val fading = fadingBitmaps.getOrNull(idx)
 
                 if (fading != null) {
-                    paint.alpha = 255
-                    canvas.drawBitmap(fading, centerCropRect(fading.width, fading.height, dest.width().toInt(), dest.height().toInt()), dest, paint)
+                    val fadingKbState = if (prefs.kenBurnsEnabled) fadingKenBurnsStates.getOrNull(idx) else null
+                    if (fadingKbState != null) {
+                        drawBitmapKenBurnsWithState(canvas, fading, dest, fadingKbState, 255)
+                    } else {
+                        paint.alpha = 255
+                        canvas.drawBitmap(fading, centerCropRect(fading.width, fading.height, dest.width().toInt(), dest.height().toInt()), dest, paint)
+                        paint.alpha = 255
+                    }
                 }
                 if (bitmap != null) {
-                    paint.alpha = (alpha * 255).toInt()
-                    canvas.drawBitmap(bitmap, centerCropRect(bitmap.width, bitmap.height, dest.width().toInt(), dest.height().toInt()), dest, paint)
-                    paint.alpha = 255
+                    val bitmapAlpha = (alpha * 255).toInt()
+                    if (prefs.kenBurnsEnabled) {
+                        drawBitmapKenBurns(canvas, bitmap, dest, idx, bitmapAlpha)
+                    } else {
+                        paint.alpha = bitmapAlpha
+                        canvas.drawBitmap(bitmap, centerCropRect(bitmap.width, bitmap.height, dest.width().toInt(), dest.height().toInt()), dest, paint)
+                        paint.alpha = 255
+                    }
                 } else if (fading == null) {
                     placeholderPaint.color = placeholderColors[idx % 4]
                     canvas.drawRect(dest, placeholderPaint)
                 }
 
-                    canvas.restore()
+                canvas.restore()
             }
 
             if (bitmaps.isEmpty()) {
@@ -734,6 +840,74 @@ class LiveWallpaperService : WallpaperService() {
             val baselineY = cy - (fm.ascent + fm.descent) / 2f
             canvas.drawText(text, cx, baselineY, noImagesTextPaint)
         }
+
+        private fun drawBitmapKenBurns(canvas: Canvas, bitmap: Bitmap, dest: RectF, cellIdx: Int, alpha: Int) {
+            var state = kenBurnsStates.getOrNull(cellIdx)
+            if (state == null) {
+                paint.alpha = alpha
+                canvas.drawBitmap(bitmap, centerCropRect(bitmap.width, bitmap.height, dest.width().toInt(), dest.height().toInt()), dest, paint)
+                paint.alpha = 255
+                return
+            }
+            val elapsed = (SystemClock.uptimeMillis() - state.startTime).toFloat()
+            if (elapsed >= KB_DURATION_MS) {
+                val r = java.util.Random()
+                val minScale = 1.0f; val maxScale = 1.2f
+                val next = KenBurnsState(
+                    startScale = state.endScale,
+                    endScale   = minScale + r.nextFloat() * (maxScale - minScale),
+                    startPanX  = state.endPanX,
+                    startPanY  = state.endPanY,
+                    endPanX    = r.nextFloat() * 2f - 1f,
+                    endPanY    = r.nextFloat() * 2f - 1f,
+                    startTime  = SystemClock.uptimeMillis()
+                )
+                kenBurnsStates[cellIdx] = next
+                state = next
+            }
+            val t = ((SystemClock.uptimeMillis() - state.startTime).toFloat() / KB_DURATION_MS).coerceIn(0f, 1f)
+            val scale  = lerp(state.startScale, state.endScale, t)
+            val panX   = lerp(state.startPanX, state.endPanX, t)
+            val panY   = lerp(state.startPanY, state.endPanY, t)
+            val scaledW = dest.width() * scale
+            val scaledH = dest.height() * scale
+            val maxPanX = (scaledW - dest.width()) / 2f
+            val maxPanY = (scaledH - dest.height()) / 2f
+            val cx = dest.centerX(); val cy = dest.centerY()
+            val scaledDest = RectF(
+                cx + panX * maxPanX - scaledW / 2f,
+                cy + panY * maxPanY - scaledH / 2f,
+                cx + panX * maxPanX + scaledW / 2f,
+                cy + panY * maxPanY + scaledH / 2f
+            )
+            paint.alpha = alpha
+            canvas.drawBitmap(bitmap, centerCropRect(bitmap.width, bitmap.height, scaledDest.width().toInt(), scaledDest.height().toInt()), scaledDest, paint)
+            paint.alpha = 255
+        }
+
+        /** Draw a bitmap with a specific KB state — no looping, no state mutation. Used for frozen fading bitmaps. */
+        private fun drawBitmapKenBurnsWithState(canvas: Canvas, bitmap: Bitmap, dest: RectF, state: KenBurnsState, alpha: Int) {
+            val t = ((SystemClock.uptimeMillis() - state.startTime).toFloat() / KB_DURATION_MS).coerceIn(0f, 1f)
+            val scale  = lerp(state.startScale, state.endScale, t)
+            val panX   = lerp(state.startPanX, state.endPanX, t)
+            val panY   = lerp(state.startPanY, state.endPanY, t)
+            val scaledW = dest.width() * scale
+            val scaledH = dest.height() * scale
+            val maxPanX = (scaledW - dest.width()) / 2f
+            val maxPanY = (scaledH - dest.height()) / 2f
+            val cx = dest.centerX(); val cy = dest.centerY()
+            val scaledDest = RectF(
+                cx + panX * maxPanX - scaledW / 2f,
+                cy + panY * maxPanY - scaledH / 2f,
+                cx + panX * maxPanX + scaledW / 2f,
+                cy + panY * maxPanY + scaledH / 2f
+            )
+            paint.alpha = alpha
+            canvas.drawBitmap(bitmap, centerCropRect(bitmap.width, bitmap.height, scaledDest.width().toInt(), scaledDest.height().toInt()), scaledDest, paint)
+            paint.alpha = 255
+        }
+
+        private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
 
         private fun centerCropRect(bw: Int, bh: Int, dw: Int, dh: Int): Rect {
             if (dw <= 0 || dh <= 0) return Rect(0, 0, bw, bh)

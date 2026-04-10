@@ -54,4 +54,6 @@
     <string name="grid_color">Rasterfarbe</string>
     <string name="grid_color_desc">Hintergrundfarbe zwischen den Bildern</string>
     <string name="grid_color_picker_title">Rasterfarbe wählen</string>
+    <string name="ken_burns">Ken-Burns-Effekt</string>
+    <string name="ken_burns_desc">Langsames Schwenken und Zoomen jedes Fotos während der Anzeige</string>
 </resources>

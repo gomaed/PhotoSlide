@@ -52,6 +52,7 @@ class GeneralSettingsFragment : Fragment() {
         setupSortOrder()
         setupGridAppearance()
         setupDoubleTapSwitch()
+        setupKenBurnsSwitch()
         setupSetWallpaperFab()
     }
 
@@ -222,6 +223,13 @@ class GeneralSettingsFragment : Fragment() {
         binding.doubleTapSwitch.isChecked = prefs.doubleTapAdvance
         binding.doubleTapSwitch.setOnCheckedChangeListener { _, checked ->
             prefs.doubleTapAdvance = checked
+        }
+    }
+
+    private fun setupKenBurnsSwitch() {
+        binding.kenBurnsSwitch.isChecked = prefs.kenBurnsEnabled
+        binding.kenBurnsSwitch.setOnCheckedChangeListener { _, checked ->
+            prefs.kenBurnsEnabled = checked
         }
     }
 
