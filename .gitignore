@@ -13,6 +13,10 @@ local.properties
 /app/release/
 /app/build/
 
+# Test source sets (no tests written — excluded intentionally)
+/app/src/test/
+/app/src/androidTest/
+
 # Signing keystores and credentials — NEVER commit these
 *.jks
 *.keystore
