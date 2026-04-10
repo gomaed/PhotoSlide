@@ -28,16 +28,6 @@ PhotoSlide is an Android live wallpaper that turns your photo library into a dyn
 - **Rescan button** — manually trigger a fresh folder scan from the Folders tab without restarting the wallpaper
 - **Tap to configure** — tap the "No Pictures Selected" pill on the wallpaper to jump straight to folder settings
 
-## Privacy
-
-| | |
-|---|---|
-| 🚫 No tracking | No analytics, no crash reporting, no telemetry |
-| 🚫 No ads | No advertising SDKs of any kind |
-| 🚫 No permissions | No storage, location, or network permissions required |
-| 🚫 No logging | Nothing is recorded or stored outside your device |
-| ✅ 100% offline | No internet connection required or used |
-
 ## Screenshots
 
 <table>
@@ -47,6 +37,31 @@ PhotoSlide is an Android live wallpaper that turns your photo library into a dyn
     <td><img src="Screenshots/Screenshot_20260404-173857.png" width="150" alt="Settings"/></td>
     <td><img src="Screenshots/Screenshot_20260404-173908.png" width="150" alt="Layout Selection"/></td>
     <td><img src="Screenshots/Screenshot_20260404-174026.png" width="150" alt="Folder Selection"/></td>
+  </tr>
+</table>
+
+## Privacy
+
+<table width="100%">
+  <tr>
+    <td>🚫 No tracking</td>
+    <td>No analytics, no crash reporting, no telemetry of any kind</td>
+  </tr>
+  <tr>
+    <td>🚫 No ads</td>
+    <td>No advertising SDKs or networks of any kind</td>
+  </tr>
+  <tr>
+    <td>🚫 No permissions</td>
+    <td>No storage, location, or network permissions required</td>
+  </tr>
+  <tr>
+    <td>🚫 No logging</td>
+    <td>Nothing is recorded or stored outside your own device</td>
+  </tr>
+  <tr>
+    <td>✅ 100% offline</td>
+    <td>No internet connection required or used — ever</td>
   </tr>
 </table>
 
