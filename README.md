@@ -28,6 +28,16 @@ PhotoSlide is an Android live wallpaper that turns your photo library into a dyn
 - **Rescan button** — manually trigger a fresh folder scan from the Folders tab without restarting the wallpaper
 - **Tap to configure** — tap the "No Pictures Selected" pill on the wallpaper to jump straight to folder settings
 
+## Privacy
+
+| | |
+|---|---|
+| 🚫 No tracking | No analytics, no crash reporting, no telemetry |
+| 🚫 No ads | No advertising SDKs of any kind |
+| 🚫 No permissions | No storage, location, or network permissions required |
+| 🚫 No logging | Nothing is recorded or stored outside your device |
+| ✅ 100% offline | No internet connection required or used |
+
 ## Screenshots
 
 <table>
