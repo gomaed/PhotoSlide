@@ -150,18 +150,52 @@ class LiveWallpaperService : WallpaperService() {
 
         private var isLoading = false
         private var loadingRotation = 0f
-        private var loadingSweep = 15f
-        private var loadingStep = 0
+        private var loadingSweep = 10f
+        private var loadingStartTime = 0L
+        private var loadingHeadAngle = 0f
+        private var loadingTailAngle = 0f
+        private var loadingPrevTime  = 0L
 
         // Drives the loading spinner — runs on handlerThread, independent of Choreographer.
+        // Matches Material CircularProgressIndicator: both head and tail always move forward.
+        // Each frame the sweep error is applied to the head (grow) or tail (shrink), so the
+        // arc extends from the front and retracts from the back — neither end ever stops.
         private val spinnerRunnable = object : Runnable {
+            private val cycleDuration = 1600f
+            private val baseSpeed     = 0.18f   // deg/ms — base rotation both ends share
+            private val minSweep      = 10f
+            private val maxSweep      = 270f
+
             override fun run() {
                 if (!isLoading) return
-                loadingRotation = (loadingRotation + 5f) % 360f
-                val step = loadingStep % 160
-                loadingSweep = if (step < 80) 15f + step * (265f / 80f)
-                               else 280f - (step - 80) * (265f / 80f)
-                loadingStep++
+                val now = SystemClock.uptimeMillis()
+                val dt = if (loadingPrevTime == 0L) 16f
+                         else (now - loadingPrevTime).coerceIn(1L, 100L).toFloat()
+                loadingPrevTime = now
+
+                val elapsed = (now - loadingStartTime).toFloat()
+                val t = (elapsed % cycleDuration) / cycleDuration
+                val targetSweep = if (t < 0.5f) {
+                    lerp(minSweep, maxSweep, smoothStep(t / 0.5f))
+                } else {
+                    lerp(maxSweep, minSweep, smoothStep((t - 0.5f) / 0.5f))
+                }
+
+                val base       = baseSpeed * dt
+                val sweepDelta = targetSweep - (loadingHeadAngle - loadingTailAngle)
+                if (sweepDelta >= 0f) {
+                    // Growing: head gets the extra push, tail advances at base speed
+                    loadingTailAngle += base
+                    loadingHeadAngle += base + sweepDelta
+                } else {
+                    // Shrinking: tail gets the extra push (catches up), head at base speed
+                    loadingHeadAngle += base
+                    loadingTailAngle += base - sweepDelta
+                }
+
+                loadingRotation = loadingTailAngle
+                loadingSweep    = loadingHeadAngle - loadingTailAngle
+
                 drawFrame()
                 handler.postDelayed(this, 16L)
             }
@@ -408,7 +442,10 @@ class LiveWallpaperService : WallpaperService() {
         }
 
         private fun startLoadingAnimation() {
-            loadingRotation = 0f; loadingSweep = 15f; loadingStep = 0
+            loadingStartTime = SystemClock.uptimeMillis()
+            loadingHeadAngle = 0f
+            loadingTailAngle = 0f
+            loadingPrevTime  = 0L
             handler.removeCallbacks(spinnerRunnable)
             handler.post(spinnerRunnable)
         }
@@ -675,6 +712,14 @@ class LiveWallpaperService : WallpaperService() {
             val right = cx + pillW / 2f
             val bottom = cy + pillH / 2f
 
+            // Shadow — three concentric semi-transparent layers for a soft even glow
+            noImagesScrimPaint.color = Color.argb(40, 0, 0, 0)
+            canvas.drawRoundRect(left - 2.4f, top - 2.4f, right + 2.4f, bottom + 2.4f, radius + 2.4f, radius + 2.4f, noImagesScrimPaint)
+            noImagesScrimPaint.color = Color.argb(25, 0, 0, 0)
+            canvas.drawRoundRect(left - 4f, top - 4f, right + 4f, bottom + 4f, radius + 4f, radius + 4f, noImagesScrimPaint)
+            noImagesScrimPaint.color = Color.argb(15, 0, 0, 0)
+            canvas.drawRoundRect(left - 5.6f, top - 5.6f, right + 5.6f, bottom + 5.6f, radius + 5.6f, radius + 5.6f, noImagesScrimPaint)
+
             // Pill background
             val pillColor = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S)
                 resources.getColor(android.R.color.system_neutral1_800, null)
@@ -746,6 +791,9 @@ class LiveWallpaperService : WallpaperService() {
                 Rect(0, yOff, bw, yOff + scaledH)
             }
         }
+
+        private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
+        private fun smoothStep(t: Float) = t * t * (3f - 2f * t)
 
         private fun recycleBitmaps() {
             bitmaps.forEach { it?.recycle() }; bitmaps = emptyArray()
