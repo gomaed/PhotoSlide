@@ -17,7 +17,6 @@ android {
         versionCode = 6
         versionName = "1.1.4"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -51,7 +50,4 @@ dependencies {
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.viewpager2)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
 }
