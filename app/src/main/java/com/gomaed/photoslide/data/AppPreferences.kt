@@ -31,7 +31,11 @@ class AppPreferences(context: Context) {
         const val KEY_GRID_COLOR = "grid_color"
         const val KEY_GRID_CORNER_RADIUS = "grid_corner_radius"
         const val KEY_IS_SCANNING = "is_scanning"
+        const val KEY_IS_FACE_SCANNING = "is_face_scanning"
+        const val KEY_FACE_SCAN_PROGRESS = "face_scan_progress"
         const val KEY_FADE_DURATION = "fade_duration"
+        const val KEY_CENTER_FACES = "center_faces"
+        const val KEY_FACES_ONLY   = "faces_only"
     }
 
     var selectedFolderUris: Set<String>
@@ -74,6 +78,14 @@ class AppPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_IS_SCANNING, false)
         set(value) { prefs.edit().putBoolean(KEY_IS_SCANNING, value).apply() }
 
+    var isFaceScanning: Boolean
+        get() = prefs.getBoolean(KEY_IS_FACE_SCANNING, false)
+        set(value) { prefs.edit().putBoolean(KEY_IS_FACE_SCANNING, value).apply() }
+
+    var faceScanProgress: Int
+        get() = prefs.getInt(KEY_FACE_SCAN_PROGRESS, 0)
+        set(value) { prefs.edit().putInt(KEY_FACE_SCAN_PROGRESS, value).apply() }
+
     var gridCornerRadius: Int
         get() = prefs.getInt(KEY_GRID_CORNER_RADIUS, 8)
         set(value) { prefs.edit().putInt(KEY_GRID_CORNER_RADIUS, value).apply() }
@@ -86,6 +98,14 @@ class AppPreferences(context: Context) {
     var fadeDuration: Int
         get() = prefs.getInt(KEY_FADE_DURATION, 800)
         set(value) { prefs.edit().putInt(KEY_FADE_DURATION, value).apply() }
+
+    var centerFacesEnabled: Boolean
+        get() = prefs.getBoolean(KEY_CENTER_FACES, false)
+        set(value) { prefs.edit().putBoolean(KEY_CENTER_FACES, value).apply() }
+
+    var facesOnlyEnabled: Boolean
+        get() = prefs.getBoolean(KEY_FACES_ONLY, false)
+        set(value) { prefs.edit().putBoolean(KEY_FACES_ONLY, value).apply() }
 
     // 50 = no stagger (50/50), 70 = max stagger (70/30)
     var staggerRatio: Int

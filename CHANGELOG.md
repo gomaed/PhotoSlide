@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.2.0] — 2026-04-10
+
+### Added
+- **Faces Only** — scans your library for photos containing faces and limits the wallpaper to those; scan runs in the background with a determinate progress indicator in the toolbar
+- **Center Faces** — automatically pans each photo so detected faces are centred on screen
+- Face scan results are persisted to disk and survive reboots; cache is invalidated automatically when folders change
+
+### Changed
+- Settings UI redesigned to match Android 16 grouped style — items are visually grouped with rounded outer corners, small transparent gaps between items, and no card shadows
+- Sort order replaced by a pill-shaped button that opens a single-choice dialog
+- Settings toolbar title shortened from "PhotoSlide Settings" to "PhotoSlide"
+- Toolbar no longer changes colour when scrolling content underneath it
+- Option labels use regular-weight text (`textAppearanceBodyLarge`) instead of medium-weight
+- Folder list item text matches settings page text style
+- Stagger slider on the Layout page matches the settings card style
+- License changed from GPL v3 to MIT
+
+### Fixed
+- Wallpaper no longer shows the loading spinner during a face scan
+- Photo selection is properly randomised after a face scan completes
+- Disabling the Faces Only toggle now correctly aborts any in-progress scan
+- Enabling Faces Only no longer shows the confirmation dialog twice
+
 ## [1.1.4] — 2026-04-10
 
 ### Added

@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">PhotoSlide</string>
     <string name="wallpaper_description">Zeigt Fotos aus deinen ausgewählten Ordnern in einem Raster an</string>
-    <string name="settings_title">PhotoSlide Einstellungen</string>
+    <string name="settings_title">PhotoSlide</string>
 
     <!-- Bottom navigation -->
     <string name="nav_folders">Ordner</string>
@@ -32,7 +32,10 @@
     <string name="sort_name_asc">Name (A\u2013Z)</string>
     <string name="sort_date_desc">Datum (Neueste zuerst)</string>
     <string name="sort_random">Zufällig</string>
-    <string name="grid_appearance">Raster-Darstellung</string>
+    <string name="grid_appearance">Raster</string>
+    <string name="section_playback">Wiedergabe</string>
+    <string name="section_interaction">Interaktion</string>
+    <string name="section_face_detection">Gesichtserkennung</string>
     <string name="grid_width">Rasterbreite</string>
     <string name="grid_width_off">Aus</string>
     <string name="interval_5s">5 Sekunden</string>
@@ -54,4 +57,11 @@
     <string name="grid_color">Rasterfarbe</string>
     <string name="grid_color_desc">Hintergrundfarbe zwischen den Bildern</string>
     <string name="grid_color_picker_title">Rasterfarbe wählen</string>
+    <string name="center_faces">Gesichter zentrieren</string>
+    <string name="center_faces_desc">Gesichter erkennen und den Ausschnitt so verschieben, dass sie sichtbar bleiben</string>
+    <string name="faces_only">Nur Gesichter</string>
+    <string name="faces_only_desc">Nur Fotos anzeigen, auf denen ein Gesicht erkannt wurde</string>
+    <string name="faces_only_warning_title">Gesichtsanalyse erforderlich</string>
+    <string name="faces_only_warning_message">Diese Funktion scannt deine gesamte Fotobibliothek nach Gesichtern. Je nach Größe der Bibliothek kann das mehrere Minuten dauern.\n\nDas Hintergrundbild zeigt weiterhin Fotos, während der Scan im Hintergrund läuft.</string>
+    <string name="scanning_faces">Analysiere…</string>
 </resources>

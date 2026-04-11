@@ -20,6 +20,9 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import com.gomaed.photoslide.data.AppPreferences
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,10 +31,53 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 class LiveWallpaperService : WallpaperService() {
+
+    // ── Face detection ────────────────────────────────────────────────────────
+    // Results cached by URI so detection only runs once per image.
+    // PointF(-1,-1) is used as a sentinel for "no faces detected".
+    private val faceCache = java.util.concurrent.ConcurrentHashMap<String, android.graphics.PointF>()
+    private val faceDetector by lazy {
+        FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
+                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
+                .setMinFaceSize(0.1f)
+                .build()
+        )
+    }
+
+    suspend fun detectFocusPoint(bitmap: Bitmap, uri: Uri): android.graphics.PointF? {
+        val key = uri.toString()
+        faceCache[key]?.let { return if (it.x < 0f) null else it }
+        return try {
+            val image = InputImage.fromBitmap(bitmap, 0)
+            val faces = suspendCancellableCoroutine { cont ->
+                faceDetector.process(image)
+                    .addOnSuccessListener { cont.resume(it) }
+                    .addOnFailureListener { cont.resume(emptyList()) }
+            }
+            val focus = if (faces.isEmpty()) null else {
+                val l = faces.minOf { it.boundingBox.left }
+                val t = faces.minOf { it.boundingBox.top }
+                val r = faces.maxOf { it.boundingBox.right }
+                val b = faces.maxOf { it.boundingBox.bottom }
+                android.graphics.PointF(
+                    (l + r) / 2f / bitmap.width,
+                    (t + b) / 2f / bitmap.height
+                )
+            }
+            faceCache[key] = focus ?: android.graphics.PointF(-1f, -1f)
+            focus
+        } catch (_: Exception) { null }
+    }
 
     // ── Service-level image pool ──────────────────────────────────────────────
     // Shared across all engine instances (homescreen + preview).
@@ -43,10 +89,108 @@ class LiveWallpaperService : WallpaperService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var scanJob: Job? = null
 
+    // ── Faces-only filter ─────────────────────────────────────────────────────
+    @Volatile var facesOnlyImages: List<Uri> = emptyList()
+    private var faceScanJob: Job? = null
+
+    /** The image pool engines should use — respects the faces-only toggle. */
+    val effectiveImages: List<Uri>
+        get() = if (servicePrefs.facesOnlyEnabled && facesOnlyImages.isNotEmpty()) facesOnlyImages
+                else images
+
+    /** Scan every image at low resolution and populate [facesOnlyImages].
+     *  Calls [onComplete] on the main thread when finished.
+     *  Shows the toolbar scan spinner in SettingsActivity while running. */
+    fun startFaceScan(onComplete: (List<Uri>) -> Unit) {
+        faceScanJob?.cancel()
+        servicePrefs.isFaceScanning = true
+        servicePrefs.faceScanProgress = 0
+        faceScanJob = serviceScope.launch {
+            try {
+                val allImages = images
+                val total = allImages.size
+                val faceImages = mutableListOf<Uri>()
+                var processed = 0
+                var lastPercent = -1
+                for (uri in allImages) {
+                    if (!isActive) break
+                    val key = uri.toString()
+                    val cached = faceCache[key]
+                    if (cached != null) {
+                        if (cached.x >= 0f) faceImages.add(uri)
+                    } else {
+                        val bmp = decodeSmallBitmap(uri)
+                        if (bmp != null) {
+                            val focus = detectFocusPoint(bmp, uri)
+                            bmp.recycle()
+                            if (focus != null) faceImages.add(uri)
+                        }
+                    }
+                    processed++
+                    if (total > 0) {
+                        val percent = processed * 100 / total
+                        if (percent != lastPercent) {
+                            lastPercent = percent
+                            servicePrefs.faceScanProgress = percent
+                        }
+                    }
+                }
+                facesOnlyImages = faceImages
+                withContext(Dispatchers.IO) { saveFacesOnlyCache(faceImages) }
+                withContext(Dispatchers.Main) { onComplete(faceImages) }
+            } finally {
+                servicePrefs.isFaceScanning = false
+            }
+        }
+    }
+
+    // ── Faces-only disk cache ─────────────────────────────────────────────────
+    // Survives reboots. Invalidated whenever folders change (hash mismatch).
+
+    private fun facesOnlyCacheFile() = java.io.File(filesDir, "faces_only_cache.txt")
+
+    private fun saveFacesOnlyCache(uris: List<Uri>) {
+        try {
+            facesOnlyCacheFile().bufferedWriter().use { w ->
+                w.write(ImageScanner.folderHash(servicePrefs)); w.newLine()
+                uris.forEach { w.write(it.toString()); w.newLine() }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun loadFacesOnlyCache(): List<Uri>? = try {
+        val file = facesOnlyCacheFile()
+        if (!file.exists()) null
+        else {
+            val lines = file.readLines()
+            if (lines.isEmpty() || lines[0] != ImageScanner.folderHash(servicePrefs)) null
+            else lines.drop(1).filter { it.isNotBlank() }.map { Uri.parse(it) }
+        }
+    } catch (_: Exception) { null }
+
+    private fun clearFacesOnlyCache() {
+        try { facesOnlyCacheFile().delete() } catch (_: Exception) {}
+    }
+
+    private suspend fun decodeSmallBitmap(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            val source = ImageDecoder.createSource(contentResolver, uri)
+            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                val scale = 320f / maxOf(info.size.width, info.size.height)
+                if (scale < 1f) decoder.setTargetSize(
+                    (info.size.width * scale).toInt(),
+                    (info.size.height * scale).toInt()
+                )
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            }
+        } catch (_: Exception) { null }
+    }
+
     override fun onCreateEngine(): Engine = WallpaperEngine()
 
     override fun onDestroy() {
         super.onDestroy()
+        faceScanJob?.cancel()
         serviceScope.cancel()
     }
 
@@ -85,7 +229,10 @@ class LiveWallpaperService : WallpaperService() {
         scanComplete = false
         rawImages = emptyList()
         images = emptyList()
+        facesOnlyImages = emptyList()
+        clearFacesOnlyCache()
         scanJob?.cancel()
+        faceScanJob?.cancel()
     }
 
     private fun applySort(prefs: AppPreferences): List<Uri> = when (prefs.sortOrder) {
@@ -124,6 +271,8 @@ class LiveWallpaperService : WallpaperService() {
         private var advanceCellPos = 0
         private var bitmaps: Array<Bitmap?> = emptyArray()
         private var fadingBitmaps: Array<Bitmap?> = emptyArray()
+        private var focusPoints: Array<android.graphics.PointF?> = emptyArray()
+        private var fadingFocusPoints: Array<android.graphics.PointF?> = emptyArray()
         private var fadeAlphas: FloatArray = FloatArray(0)
         private var fadeStartTimes: LongArray = LongArray(0)
         private var fadeDurations: LongArray = LongArray(0)
@@ -216,6 +365,7 @@ class LiveWallpaperService : WallpaperService() {
                         fadeStartTimes[idx] = 0L
                         fadingBitmaps[idx]?.recycle()
                         fadingBitmaps[idx] = null
+                        if (idx < fadingFocusPoints.size) fadingFocusPoints[idx] = null
                     } else {
                         fadeAlphas[idx] = elapsed.toFloat() / dur
                         anyActive = true
@@ -276,7 +426,7 @@ class LiveWallpaperService : WallpaperService() {
                         return false
                     }
                     override fun onDoubleTap(e: MotionEvent): Boolean {
-                        val imgs = this@LiveWallpaperService.images
+                        val imgs = this@LiveWallpaperService.effectiveImages
                         if (prefs.doubleTapAdvance && imgs.isNotEmpty() && cellIndices.isNotEmpty()) {
                             val cell = cellAtPosition(e.x, e.y)
                             cellIndices[cell] = (cellIndices[cell] + 1) % imgs.size
@@ -325,7 +475,7 @@ class LiveWallpaperService : WallpaperService() {
 
         private val advanceRunnable = object : Runnable {
             override fun run() {
-                val imgs = this@LiveWallpaperService.images
+                val imgs = this@LiveWallpaperService.effectiveImages
                 if (imgs.isNotEmpty() && cellIndices.isNotEmpty()) {
                     cellIndices[advanceCellPos] = (cellIndices[advanceCellPos] + 1) % imgs.size
                     val cell = advanceCellPos
@@ -423,6 +573,25 @@ class LiveWallpaperService : WallpaperService() {
                 AppPreferences.KEY_GRID_COLOR,
                 AppPreferences.KEY_GRID_CORNER_RADIUS -> drawFrame()
 
+                AppPreferences.KEY_CENTER_FACES -> {
+                    if (prefs.centerFacesEnabled) scope.launch { reloadAllBitmaps() }
+                    else drawFrame()
+                }
+
+                AppPreferences.KEY_FACES_ONLY -> {
+                    if (prefs.facesOnlyEnabled) {
+                        this@LiveWallpaperService.startFaceScan {
+                            portraitCellIndices = IntArray(0)
+                            landscapeCellIndices = IntArray(0)
+                            scope.launch { reloadAllBitmaps() }
+                        }
+                    } else {
+                        this@LiveWallpaperService.faceScanJob?.cancel()
+                        this@LiveWallpaperService.facesOnlyImages = emptyList()
+                        scope.launch { reloadAllBitmaps() }
+                    }
+                }
+
                 AppPreferences.KEY_SLIDE_INTERVAL -> {
                     if (isVisible) scheduleNextAdvance()
                 }
@@ -437,7 +606,28 @@ class LiveWallpaperService : WallpaperService() {
             isLoading = true
             startLoadingAnimation()
             this@LiveWallpaperService.ensureImages(prefs) {
-                scope.launch { reloadAllBitmaps() }
+                scope.launch {
+                    if (prefs.facesOnlyEnabled) {
+                        val cached = withContext(Dispatchers.IO) {
+                            this@LiveWallpaperService.loadFacesOnlyCache()
+                        }
+                        if (cached != null) {
+                            // Restore from disk — no scan needed, instant startup
+                            this@LiveWallpaperService.facesOnlyImages = cached
+                            reloadAllBitmaps()
+                        } else {
+                            // No valid cache — show full set immediately, scan in background
+                            reloadAllBitmaps()
+                            this@LiveWallpaperService.startFaceScan {
+                                portraitCellIndices = IntArray(0)
+                                landscapeCellIndices = IntArray(0)
+                                scope.launch { reloadAllBitmaps() }
+                            }
+                        }
+                    } else {
+                        reloadAllBitmaps()
+                    }
+                }
             }
         }
 
@@ -456,13 +646,13 @@ class LiveWallpaperService : WallpaperService() {
 
         private suspend fun reloadAllBitmaps() {
             if (surfaceWidth == 0 || surfaceHeight == 0) return
-            val imgs = this@LiveWallpaperService.images
+            val imgs = this@LiveWallpaperService.effectiveImages
             val rects = cellRects()
             val needed = rects.size
 
             val saved = if (isLandscape) landscapeCellIndices else portraitCellIndices
             cellIndices = if (saved.size == needed && imgs.isNotEmpty()) {
-                saved.copyOf()
+                IntArray(needed) { i -> saved[i] % imgs.size }
             } else {
                 val step = if (imgs.size > needed) imgs.size / needed else 1
                 val offset = if (imgs.isEmpty()) 0 else (0 until imgs.size).random()
@@ -472,24 +662,30 @@ class LiveWallpaperService : WallpaperService() {
             else portraitCellIndices = cellIndices.copyOf()
             advanceCellPos = if (needed > 0) advanceCellPos % needed else 0
 
-            // ③ Parallel decode — all cells decoded concurrently on the IO thread pool
-            val newBitmaps = withContext(Dispatchers.IO) {
+            // ③ Parallel decode + face detection — all cells processed concurrently
+            val cellData = withContext(Dispatchers.IO) {
                 coroutineScope {
                     (0 until needed).map { i ->
                         async {
-                            if (imgs.isEmpty()) return@async null
+                            if (imgs.isEmpty()) return@async null to null
                             val r = rects[i]
-                            try { decodeSampledBitmap(imgs[cellIndices[i]], r.width().toInt(), r.height().toInt()) }
-                            catch (_: Exception) { null }
+                            val bmp = try { decodeSampledBitmap(imgs[cellIndices[i]], r.width().toInt(), r.height().toInt()) }
+                                      catch (_: Exception) { null }
+                            val focus = if (bmp != null && prefs.centerFacesEnabled) detectFocusPoint(bmp, imgs[cellIndices[i]]) else null
+                            bmp to focus
                         }
-                    }.awaitAll().toTypedArray()
+                    }.awaitAll()
                 }
             }
+            val newBitmaps: Array<Bitmap?> = Array(needed) { cellData[it]?.first }
+            val newFocusPoints: Array<android.graphics.PointF?> = Array(needed) { cellData[it]?.second }
 
             handler.removeCallbacks(fadeRunnable)
             val oldBitmaps = bitmaps; val oldFading = fadingBitmaps
             bitmaps = newBitmaps
             fadingBitmaps = Array(needed) { null }
+            focusPoints = newFocusPoints
+            fadingFocusPoints = Array(needed) { null }
             fadeAlphas = FloatArray(needed) { 1f }
             fadeStartTimes = LongArray(needed) { 0L }
             fadeDurations = LongArray(needed) { 0L }
@@ -502,28 +698,34 @@ class LiveWallpaperService : WallpaperService() {
 
         private suspend fun refreshBitmaps() {
             if (surfaceWidth == 0 || surfaceHeight == 0) return
-            val imgs = this@LiveWallpaperService.images
+            val imgs = this@LiveWallpaperService.effectiveImages
             val rects = cellRects()
             val needed = rects.size
             if (cellIndices.size != needed) { reloadAllBitmaps(); return }
 
-            val newBitmaps = withContext(Dispatchers.IO) {
+            val cellData = withContext(Dispatchers.IO) {
                 coroutineScope {
                     (0 until needed).map { i ->
                         async {
-                            if (imgs.isEmpty()) return@async null
+                            if (imgs.isEmpty()) return@async null to null
                             val r = rects[i]
-                            try { decodeSampledBitmap(imgs[cellIndices[i]], r.width().toInt(), r.height().toInt()) }
-                            catch (_: Exception) { null }
+                            val bmp = try { decodeSampledBitmap(imgs[cellIndices[i]], r.width().toInt(), r.height().toInt()) }
+                                      catch (_: Exception) { null }
+                            val focus = if (bmp != null && prefs.centerFacesEnabled) detectFocusPoint(bmp, imgs[cellIndices[i]]) else null
+                            bmp to focus
                         }
-                    }.awaitAll().toTypedArray()
+                    }.awaitAll()
                 }
             }
+            val newBitmaps: Array<Bitmap?> = Array(needed) { cellData[it]?.first }
+            val newFocusPoints: Array<android.graphics.PointF?> = Array(needed) { cellData[it]?.second }
 
             handler.removeCallbacks(fadeRunnable)
             val oldBitmaps = bitmaps; val oldFading = fadingBitmaps
             bitmaps = newBitmaps
             fadingBitmaps = Array(needed) { null }
+            focusPoints = newFocusPoints
+            fadingFocusPoints = Array(needed) { null }
             fadeAlphas = FloatArray(needed) { 1f }
             fadeStartTimes = LongArray(needed) { 0L }
             fadeDurations = LongArray(needed) { 0L }
@@ -549,7 +751,7 @@ class LiveWallpaperService : WallpaperService() {
             if (cellPos >= bitmaps.size || cellPos >= cellIndices.size) return
             val rects = cellRects()
             if (cellPos >= rects.size) return
-            val imgs = this@LiveWallpaperService.images
+            val imgs = this@LiveWallpaperService.effectiveImages
             if (imgs.isEmpty()) return
             val r = rects[cellPos]
             val imageIdx = cellIndices[cellPos] % imgs.size
@@ -558,6 +760,10 @@ class LiveWallpaperService : WallpaperService() {
                 try { decodeSampledBitmap(imgs[imageIdx], r.width().toInt(), r.height().toInt()) }
                 catch (_: Exception) { null }
             }
+            val newFocus = if (newBitmap != null && prefs.centerFacesEnabled) detectFocusPoint(newBitmap, imgs[imageIdx]) else null
+            val oldFocus = focusPoints.getOrNull(cellPos)
+            if (cellPos < focusPoints.size) focusPoints[cellPos] = newFocus
+            if (cellPos < fadingFocusPoints.size) fadingFocusPoints[cellPos] = oldFocus
 
             if (fadeDuration <= 0L) {
                 fadingBitmaps[cellPos]?.recycle()
@@ -644,13 +850,17 @@ class LiveWallpaperService : WallpaperService() {
                 val alpha = fadeAlphas.getOrElse(idx) { 1f }
                 val fading = fadingBitmaps.getOrNull(idx)
 
+                val centerFaces = prefs.centerFacesEnabled
+                val focus       = if (centerFaces) focusPoints.getOrNull(idx) else null
+                val fadingFocus = if (centerFaces) fadingFocusPoints.getOrNull(idx) else null
+
                 if (fading != null) {
                     paint.alpha = 255
-                    canvas.drawBitmap(fading, centerCropRect(fading.width, fading.height, dest.width().toInt(), dest.height().toInt()), dest, paint)
+                    canvas.drawBitmap(fading, centerCropRect(fading.width, fading.height, dest.width().toInt(), dest.height().toInt(), fadingFocus?.x ?: 0.5f, fadingFocus?.y ?: 0.5f), dest, paint)
                 }
                 if (bitmap != null) {
                     paint.alpha = (alpha * 255).toInt()
-                    canvas.drawBitmap(bitmap, centerCropRect(bitmap.width, bitmap.height, dest.width().toInt(), dest.height().toInt()), dest, paint)
+                    canvas.drawBitmap(bitmap, centerCropRect(bitmap.width, bitmap.height, dest.width().toInt(), dest.height().toInt(), focus?.x ?: 0.5f, focus?.y ?: 0.5f), dest, paint)
                     paint.alpha = 255
                 } else if (fading == null) {
                     placeholderPaint.color = placeholderColors[idx % 4]
@@ -780,14 +990,16 @@ class LiveWallpaperService : WallpaperService() {
             canvas.drawText(text, cx, baselineY, noImagesTextPaint)
         }
 
-        private fun centerCropRect(bw: Int, bh: Int, dw: Int, dh: Int): Rect {
+        private fun centerCropRect(bw: Int, bh: Int, dw: Int, dh: Int, focusX: Float = 0.5f, focusY: Float = 0.5f): Rect {
             if (dw <= 0 || dh <= 0) return Rect(0, 0, bw, bh)
             val srcAspect = bw.toFloat() / bh; val dstAspect = dw.toFloat() / dh
             return if (srcAspect > dstAspect) {
-                val scaledW = (bh * dstAspect).toInt(); val xOff = (bw - scaledW) / 2
+                val scaledW = (bh * dstAspect).toInt()
+                val xOff = (focusX * bw - scaledW / 2f).toInt().coerceIn(0, (bw - scaledW).coerceAtLeast(0))
                 Rect(xOff, 0, xOff + scaledW, bh)
             } else {
-                val scaledH = (bw / dstAspect).toInt(); val yOff = (bh - scaledH) / 2
+                val scaledH = (bw / dstAspect).toInt()
+                val yOff = (focusY * bh - scaledH / 2f).toInt().coerceIn(0, (bh - scaledH).coerceAtLeast(0))
                 Rect(0, yOff, bw, yOff + scaledH)
             }
         }

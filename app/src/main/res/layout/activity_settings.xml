@@ -9,7 +9,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:fitsSystemWindows="true"
-        android:background="?attr/colorPrimaryContainer">
+        android:background="?attr/colorPrimaryContainer"
+        app:liftOnScroll="false">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
@@ -36,8 +37,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:indeterminate="true"
-                    app:indicatorSize="16dp"
-                    app:trackThickness="2dp" />
+                    app:indicatorSize="28dp"
+                    app:trackThickness="3dp" />
 
                 <TextView
                     android:id="@+id/scan_label"

@@ -10,8 +10,6 @@ import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.GridLayout
 import androidx.fragment.app.Fragment
 import com.gomaed.photoslide.R
@@ -52,6 +50,8 @@ class GeneralSettingsFragment : Fragment() {
         setupSortOrder()
         setupGridAppearance()
         setupDoubleTapSwitch()
+        setupCenterFacesSwitch()
+        setupFacesOnlySwitch()
         setupSetWallpaperFab()
     }
 
@@ -113,7 +113,7 @@ class GeneralSettingsFragment : Fragment() {
         if (ms == 0) getString(R.string.fade_off) else "${ms}ms"
 
     private fun setupSortOrder() {
-        val sortLabels = listOf(
+        val sortLabels = arrayOf(
             getString(R.string.sort_name_asc),
             getString(R.string.sort_date_desc),
             getString(R.string.sort_random)
@@ -124,28 +124,23 @@ class GeneralSettingsFragment : Fragment() {
             AppPreferences.SORT_RANDOM
         )
 
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            sortLabels
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.sortOrderSpinner.adapter = adapter
-        binding.sortOrderSpinner.setSelection(
-            sortValues.indexOf(prefs.sortOrder).coerceAtLeast(0)
-        )
-        binding.sortOrderSpinner.onItemSelectedListener =
-            object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(
-                    parent: AdapterView<*>,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    prefs.sortOrder = sortValues[position]
+        fun updateButton() {
+            val idx = sortValues.indexOf(prefs.sortOrder).coerceAtLeast(0)
+            binding.sortOrderButton.text = sortLabels[idx]
+        }
+        updateButton()
+
+        binding.sortOrderButton.setOnClickListener {
+            val current = sortValues.indexOf(prefs.sortOrder).coerceAtLeast(0)
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.sort_order)
+                .setSingleChoiceItems(sortLabels, current) { dialog, which ->
+                    prefs.sortOrder = sortValues[which]
+                    updateButton()
+                    dialog.dismiss()
                 }
-                override fun onNothingSelected(parent: AdapterView<*>) {}
-            }
+                .show()
+        }
     }
 
     private fun setupGridAppearance() {
@@ -222,6 +217,34 @@ class GeneralSettingsFragment : Fragment() {
         binding.doubleTapSwitch.isChecked = prefs.doubleTapAdvance
         binding.doubleTapSwitch.setOnCheckedChangeListener { _, checked ->
             prefs.doubleTapAdvance = checked
+        }
+    }
+
+    private fun setupCenterFacesSwitch() {
+        binding.centerFacesSwitch.isChecked = prefs.centerFacesEnabled
+        binding.centerFacesSwitch.setOnCheckedChangeListener { _, checked ->
+            prefs.centerFacesEnabled = checked
+        }
+    }
+
+    private fun setupFacesOnlySwitch() {
+        binding.facesOnlySwitch.isChecked = prefs.facesOnlyEnabled
+        binding.facesOnlySwitch.setOnCheckedChangeListener { _, checked ->
+            if (checked && !prefs.facesOnlyEnabled) {
+                // Revert the switch visually until user confirms
+                binding.facesOnlySwitch.isChecked = false
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.faces_only_warning_title)
+                    .setMessage(R.string.faces_only_warning_message)
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        prefs.facesOnlyEnabled = true
+                        binding.facesOnlySwitch.isChecked = true
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            } else {
+                prefs.facesOnlyEnabled = checked
+            }
         }
     }
 

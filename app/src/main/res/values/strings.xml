@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">PhotoSlide</string>
     <string name="wallpaper_description">Displays photos from your selected folders in a grid</string>
-    <string name="settings_title">PhotoSlide Settings</string>
+    <string name="settings_title">PhotoSlide</string>
 
     <!-- Bottom navigation -->
     <string name="nav_folders">Folders</string>
@@ -32,7 +32,10 @@
     <string name="sort_name_asc">Name (A\u2013Z)</string>
     <string name="sort_date_desc">Date (Newest First)</string>
     <string name="sort_random">Random</string>
-    <string name="grid_appearance">Grid Appearance</string>
+    <string name="grid_appearance">Grid</string>
+    <string name="section_playback">Playback</string>
+    <string name="section_interaction">Interaction</string>
+    <string name="section_face_detection">Face Detection</string>
     <string name="grid_width">Grid Width</string>
     <string name="grid_width_off">Off</string>
     <string name="interval_5s">5 Seconds</string>
@@ -54,4 +57,11 @@
     <string name="grid_color">Grid Color</string>
     <string name="grid_color_desc">Background color shown between images</string>
     <string name="grid_color_picker_title">Choose Grid Color</string>
+    <string name="center_faces">Center Faces</string>
+    <string name="center_faces_desc">Detect faces and shift the crop to keep them visible</string>
+    <string name="faces_only">Faces Only</string>
+    <string name="faces_only_desc">Only show photos where a face is detected</string>
+    <string name="faces_only_warning_title">Face Analysis Required</string>
+    <string name="faces_only_warning_message">Enabling this feature will scan your entire photo library for faces. This can take several minutes depending on the size of your library.\n\nThe wallpaper will continue showing photos while the scan runs in the background.</string>
+    <string name="scanning_faces">Analysing…</string>
 </resources>

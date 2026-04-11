@@ -4,8 +4,10 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
@@ -19,7 +21,10 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var prefs: AppPreferences
 
     private val scanningListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == AppPreferences.KEY_IS_SCANNING) updateScanSpinner()
+        if (key == AppPreferences.KEY_IS_SCANNING ||
+            key == AppPreferences.KEY_IS_FACE_SCANNING ||
+            key == AppPreferences.KEY_FACE_SCAN_PROGRESS)
+            updateScanSpinner()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +42,13 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         setSupportActionBar(binding.toolbar)
+
+        // Colour the progress spinner to match the toolbar's colour scheme
+        val tv = TypedValue()
+        theme.resolveAttribute(com.google.android.material.R.attr.colorOnPrimaryContainer, tv, true)
+        val onPrimary = tv.data
+        binding.scanSpinner.setIndicatorColor(onPrimary)
+        binding.scanSpinner.trackColor = ColorUtils.setAlphaComponent(onPrimary, 50)
 
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
@@ -71,6 +83,25 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun updateScanSpinner() {
-        binding.scanIndicator.visibility = if (prefs.isScanning) View.VISIBLE else View.GONE
+        when {
+            prefs.isFaceScanning -> {
+                val progress = prefs.faceScanProgress
+                if (binding.scanSpinner.isIndeterminate) {
+                    binding.scanSpinner.isIndeterminate = false
+                }
+                binding.scanSpinner.max = 100
+                binding.scanSpinner.setProgressCompat(progress, true)
+                binding.scanLabel.setText(R.string.scanning_faces)
+                binding.scanIndicator.visibility = View.VISIBLE
+            }
+            prefs.isScanning -> {
+                if (!binding.scanSpinner.isIndeterminate) {
+                    binding.scanSpinner.isIndeterminate = true
+                }
+                binding.scanLabel.setText(R.string.scanning_folders)
+                binding.scanIndicator.visibility = View.VISIBLE
+            }
+            else -> binding.scanIndicator.visibility = View.GONE
+        }
     }
 }

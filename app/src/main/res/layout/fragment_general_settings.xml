@@ -32,29 +32,35 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:background="@drawable/bg_setting_item_top"
                 android:padding="16dp">
 
                 <TextView
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:text="@string/sort_order"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+                    android:textAppearance="?attr/textAppearanceBodyLarge" />
 
-                <Spinner
-                    android:id="@+id/sort_order_spinner"
-                    android:layout_width="match_parent"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/sort_order_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp" />
+                    android:layout_marginStart="16dp"
+                    android:textColor="?attr/colorPrimary"
+                    app:cornerRadius="32dp"
+                    app:strokeColor="?attr/colorOutline" />
 
             </LinearLayout>
 
             <!-- Gap -->
             <View
                 android:layout_width="match_parent"
-                android:layout_height="3dp"
-                android:background="?attr/colorSurfaceContainer" />
+                android:layout_height="2dp"
+                />
 
             <!-- Slide interval — MID -->
             <LinearLayout
@@ -75,7 +81,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/slide_interval"
-                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+                        android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                     <TextView
                         android:id="@+id/slide_interval_label"
@@ -97,8 +103,8 @@
             <!-- Gap -->
             <View
                 android:layout_width="match_parent"
-                android:layout_height="3dp"
-                android:background="?attr/colorSurfaceContainer" />
+                android:layout_height="2dp"
+                />
 
             <!-- Fade duration — BOT -->
             <LinearLayout
@@ -120,7 +126,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/picture_fade_time"
-                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+                        android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                     <TextView
                         android:id="@+id/fade_duration_label"
@@ -168,7 +174,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/grid_width"
-                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+                        android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                     <TextView
                         android:id="@+id/grid_spacing_label"
@@ -190,8 +196,8 @@
             <!-- Gap -->
             <View
                 android:layout_width="match_parent"
-                android:layout_height="3dp"
-                android:background="?attr/colorSurfaceContainer" />
+                android:layout_height="2dp"
+                />
 
             <!-- Grid color — MID -->
             <LinearLayout
@@ -208,7 +214,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/grid_color"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+                    android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                 <View
                     android:id="@+id/grid_color_swatch"
@@ -221,8 +227,8 @@
             <!-- Gap -->
             <View
                 android:layout_width="match_parent"
-                android:layout_height="3dp"
-                android:background="?attr/colorSurfaceContainer" />
+                android:layout_height="2dp"
+                />
 
             <!-- Corner radius — BOT -->
             <LinearLayout
@@ -244,7 +250,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/grid_corner_radius"
-                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+                        android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                     <TextView
                         android:id="@+id/grid_corner_radius_label"
@@ -293,7 +299,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/double_tap_advance"
-                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+                        android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                     <TextView
                         android:layout_width="match_parent"
@@ -342,7 +348,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/center_faces"
-                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+                        android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                     <TextView
                         android:layout_width="match_parent"
@@ -365,8 +371,8 @@
             <!-- Gap -->
             <View
                 android:layout_width="match_parent"
-                android:layout_height="3dp"
-                android:background="?attr/colorSurfaceContainer" />
+                android:layout_height="2dp"
+                />
 
             <!-- Faces only — BOT -->
             <LinearLayout
@@ -387,7 +393,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/faces_only"
-                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+                        android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                     <TextView
                         android:layout_width="match_parent"
