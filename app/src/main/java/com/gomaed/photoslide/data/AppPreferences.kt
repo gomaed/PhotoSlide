@@ -26,7 +26,10 @@ class AppPreferences(context: Context) {
         const val KEY_LANDSCAPE_COLS = "landscape_cols"
         const val KEY_LANDSCAPE_ROWS = "landscape_rows"
         const val KEY_GRID_SPACING = "grid_spacing"
-        const val KEY_DOUBLE_TAP_ADVANCE = "double_tap_advance"
+        const val KEY_DOUBLE_TAP_ACTION  = "double_tap_action"
+        const val DOUBLE_TAP_SWAP   = "swap"
+        const val DOUBLE_TAP_OPEN   = "open"
+        const val DOUBLE_TAP_NONE   = "none"
         const val KEY_STAGGER_RATIO = "stagger_ratio"
         const val KEY_GRID_COLOR = "grid_color"
         const val KEY_GRID_CORNER_RADIUS = "grid_corner_radius"
@@ -34,8 +37,9 @@ class AppPreferences(context: Context) {
         const val KEY_IS_FACE_SCANNING = "is_face_scanning"
         const val KEY_FACE_SCAN_PROGRESS = "face_scan_progress"
         const val KEY_FADE_DURATION = "fade_duration"
-        const val KEY_CENTER_FACES = "center_faces"
-        const val KEY_FACES_ONLY   = "faces_only"
+        const val KEY_CENTER_FACES  = "center_faces"
+        const val KEY_FACES_ONLY    = "faces_only"
+        const val KEY_SMART_RESCAN  = "smart_rescan"
     }
 
     var selectedFolderUris: Set<String>
@@ -70,9 +74,9 @@ class AppPreferences(context: Context) {
         get() = prefs.getInt(KEY_GRID_SPACING, 3)
         set(value) { prefs.edit().putInt(KEY_GRID_SPACING, value).apply() }
 
-    var doubleTapAdvance: Boolean
-        get() = prefs.getBoolean(KEY_DOUBLE_TAP_ADVANCE, true)
-        set(value) { prefs.edit().putBoolean(KEY_DOUBLE_TAP_ADVANCE, value).apply() }
+    var doubleTapAction: String
+        get() = prefs.getString(KEY_DOUBLE_TAP_ACTION, DOUBLE_TAP_SWAP) ?: DOUBLE_TAP_SWAP
+        set(value) { prefs.edit().putString(KEY_DOUBLE_TAP_ACTION, value).apply() }
 
     var isScanning: Boolean
         get() = prefs.getBoolean(KEY_IS_SCANNING, false)
@@ -106,6 +110,11 @@ class AppPreferences(context: Context) {
     var facesOnlyEnabled: Boolean
         get() = prefs.getBoolean(KEY_FACES_ONLY, false)
         set(value) { prefs.edit().putBoolean(KEY_FACES_ONLY, value).apply() }
+
+    // Pulsed true by the Rescan FAB; service resets to false after handling
+    var smartRescan: Boolean
+        get() = prefs.getBoolean(KEY_SMART_RESCAN, false)
+        set(value) { prefs.edit().putBoolean(KEY_SMART_RESCAN, value).apply() }
 
     // 50 = no stagger (50/50), 70 = max stagger (70/30)
     var staggerRatio: Int

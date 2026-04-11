@@ -94,9 +94,7 @@ class FolderSelectFragment : Fragment() {
     }
 
     private fun triggerScan() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            ImageScanner.scanToCache(requireContext(), prefs)
-        }
+        prefs.smartRescan = true
     }
 
     override fun onDestroyView() {

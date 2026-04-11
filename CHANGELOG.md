@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1] — 2026-04-11
+
+### Added
+- **Double Tap action** — replaces the on/off toggle with a three-option selector: Swap Photo (default), Open in Gallery, or No Action
+- Smart Rescan — the Rescan button now automatically handles everything: rescans folders, removes deleted photos, scans only new photos for faces if Faces Only is enabled, and clears leftover face data if Faces Only is disabled
+
 ## [1.2.0] — 2026-04-10
 
 ### Added

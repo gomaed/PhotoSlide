@@ -51,8 +51,10 @@
     <string name="interval_24h">24 Hours</string>
     <string name="interval_never">Never</string>
     <string name="set_wallpaper">Set Wallpaper</string>
-    <string name="double_tap_advance">Change Picture on Double Tap</string>
-    <string name="double_tap_advance_desc">Double tap a picture on the wallpaper to replace it immediately</string>
+    <string name="double_tap_action">Double Tap</string>
+    <string name="double_tap_swap">Swap Photo</string>
+    <string name="double_tap_open">Open in Gallery</string>
+    <string name="double_tap_none">No Action</string>
     <string name="grid_corner_radius">Corner Radius</string>
     <string name="grid_color">Grid Color</string>
     <string name="grid_color_desc">Background color shown between images</string>

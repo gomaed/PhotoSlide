@@ -49,7 +49,7 @@ class GeneralSettingsFragment : Fragment() {
         setupFadeDuration()
         setupSortOrder()
         setupGridAppearance()
-        setupDoubleTapSwitch()
+        setupDoubleTapAction()
         setupCenterFacesSwitch()
         setupFacesOnlySwitch()
         setupSetWallpaperFab()
@@ -213,10 +213,34 @@ class GeneralSettingsFragment : Fragment() {
         }
     }
 
-    private fun setupDoubleTapSwitch() {
-        binding.doubleTapSwitch.isChecked = prefs.doubleTapAdvance
-        binding.doubleTapSwitch.setOnCheckedChangeListener { _, checked ->
-            prefs.doubleTapAdvance = checked
+    private fun setupDoubleTapAction() {
+        val labels = arrayOf(
+            getString(R.string.double_tap_swap),
+            getString(R.string.double_tap_open),
+            getString(R.string.double_tap_none)
+        )
+        val values = listOf(
+            AppPreferences.DOUBLE_TAP_SWAP,
+            AppPreferences.DOUBLE_TAP_OPEN,
+            AppPreferences.DOUBLE_TAP_NONE
+        )
+
+        fun updateButton() {
+            val idx = values.indexOf(prefs.doubleTapAction).coerceAtLeast(0)
+            binding.doubleTapButton.text = labels[idx]
+        }
+        updateButton()
+
+        binding.doubleTapButton.setOnClickListener {
+            val current = values.indexOf(prefs.doubleTapAction).coerceAtLeast(0)
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.double_tap_action)
+                .setSingleChoiceItems(labels, current) { dialog, which ->
+                    prefs.doubleTapAction = values[which]
+                    updateButton()
+                    dialog.dismiss()
+                }
+                .show()
         }
     }
 

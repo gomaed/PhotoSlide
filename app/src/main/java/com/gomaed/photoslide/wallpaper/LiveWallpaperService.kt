@@ -427,10 +427,23 @@ class LiveWallpaperService : WallpaperService() {
                     }
                     override fun onDoubleTap(e: MotionEvent): Boolean {
                         val imgs = this@LiveWallpaperService.effectiveImages
-                        if (prefs.doubleTapAdvance && imgs.isNotEmpty() && cellIndices.isNotEmpty()) {
-                            val cell = cellAtPosition(e.x, e.y)
-                            cellIndices[cell] = (cellIndices[cell] + 1) % imgs.size
-                            scope.launch { reloadCell(cell, if (prefs.fadeDuration == 0) 0L else 200L) }
+                        if (imgs.isEmpty() || cellIndices.isEmpty()) return true
+                        val cell = cellAtPosition(e.x, e.y)
+                        when (prefs.doubleTapAction) {
+                            AppPreferences.DOUBLE_TAP_SWAP -> {
+                                cellIndices[cell] = (cellIndices[cell] + 1) % imgs.size
+                                scope.launch { reloadCell(cell, if (prefs.fadeDuration == 0) 0L else 200L) }
+                            }
+                            AppPreferences.DOUBLE_TAP_OPEN -> {
+                                val uri = imgs[cellIndices[cell] % imgs.size]
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                    setDataAndType(uri, "image/*")
+                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                try { startActivity(intent) } catch (_: Exception) {}
+                            }
+                            // DOUBLE_TAP_NONE → do nothing
                         }
                         return true
                     }
@@ -552,6 +565,43 @@ class LiveWallpaperService : WallpaperService() {
             drawFrame()
         }
 
+        private fun doSmartRescan(prefs: AppPreferences) {
+            val svc = this@LiveWallpaperService
+            val prevUriSet = svc.rawImages.map { it.toString() }.toHashSet()
+            svc.scanJob?.cancel()
+            svc.scanJob = svc.serviceScope.launch {
+                // 1. Rescan folders
+                val scanned = ImageScanner.scanToCache(svc, prefs)
+                val newUriSet = scanned.map { it.toString() }.toHashSet()
+
+                // Prune deleted images from faceCache (memory cleanup)
+                val deleted = prevUriSet - newUriSet
+                deleted.forEach { svc.faceCache.remove(it) }
+
+                svc.rawImages = scanned
+                svc.images = svc.applySort(prefs)
+                svc.scanComplete = true
+
+                if (prefs.facesOnlyEnabled) {
+                    // startFaceScan rebuilds facesOnlyImages from cache (skips known images)
+                    // and scans any new images not yet in faceCache
+                    svc.startFaceScan {
+                        portraitCellIndices = IntArray(0)
+                        landscapeCellIndices = IntArray(0)
+                        scope.launch { reloadAllBitmaps() }
+                    }
+                } else {
+                    // Clear any leftover face data from a previous Faces Only session
+                    if (svc.faceCache.isNotEmpty() || svc.facesOnlyImages.isNotEmpty()) {
+                        svc.faceCache.clear()
+                        svc.facesOnlyImages = emptyList()
+                        svc.clearFacesOnlyCache()
+                    }
+                    scope.launch { reloadAllBitmaps() }
+                }
+            }
+        }
+
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
             when (key) {
                 AppPreferences.KEY_FOLDER_URIS -> {
@@ -589,6 +639,13 @@ class LiveWallpaperService : WallpaperService() {
                         this@LiveWallpaperService.faceScanJob?.cancel()
                         this@LiveWallpaperService.facesOnlyImages = emptyList()
                         scope.launch { reloadAllBitmaps() }
+                    }
+                }
+
+                AppPreferences.KEY_SMART_RESCAN -> {
+                    if (prefs.smartRescan) {
+                        prefs.smartRescan = false
+                        doSmartRescan(prefs)
                     }
                 }
 

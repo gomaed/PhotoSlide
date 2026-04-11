@@ -289,33 +289,22 @@
                 android:padding="16dp"
                 android:layout_marginBottom="24dp">
 
-                <LinearLayout
+                <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:text="@string/double_tap_action"
+                    android:textAppearance="?attr/textAppearanceBodyLarge" />
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/double_tap_advance"
-                        android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/double_tap_advance_desc"
-                        android:textAppearance="?attr/textAppearanceBodySmall"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                </LinearLayout>
-
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/double_tap_switch"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/double_tap_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp" />
+                    android:layout_marginStart="16dp"
+                    android:textColor="?attr/colorPrimary"
+                    app:cornerRadius="32dp"
+                    app:strokeColor="?attr/colorOutline" />
 
             </LinearLayout>
 

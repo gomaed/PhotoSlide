@@ -51,8 +51,10 @@
     <string name="interval_24h">24 Stunden</string>
     <string name="interval_never">Nie</string>
     <string name="set_wallpaper">Hintergrundbild festlegen</string>
-    <string name="double_tap_advance">Bild bei Doppeltippen wechseln</string>
-    <string name="double_tap_advance_desc">Doppeltippe auf ein Bild, um es sofort zu ersetzen</string>
+    <string name="double_tap_action">Doppeltippen</string>
+    <string name="double_tap_swap">Foto wechseln</string>
+    <string name="double_tap_open">In Galerie öffnen</string>
+    <string name="double_tap_none">Keine Aktion</string>
     <string name="grid_corner_radius">Eckradius</string>
     <string name="grid_color">Rasterfarbe</string>
     <string name="grid_color_desc">Hintergrundfarbe zwischen den Bildern</string>
