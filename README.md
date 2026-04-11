@@ -35,10 +35,6 @@ PhotoSlide is an Android live wallpaper that turns your photo library into a dyn
 - **Light & dark mode** — fully supports system-wide light and dark theme
 - **Material You theming** — header and status bar use your device's dynamic colour palette
 
-### 🔒 Privacy
-- **No permissions required** — uses Android's Storage Access Framework; no storage permissions needed
-- **Tap to configure** — tap the "No Pictures Selected" pill on the wallpaper to jump straight to folder settings
-
 ## Screenshots
 
 <table>
