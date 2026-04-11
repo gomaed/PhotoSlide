@@ -565,43 +565,6 @@ class LiveWallpaperService : WallpaperService() {
             drawFrame()
         }
 
-        private fun doSmartRescan(prefs: AppPreferences) {
-            val svc = this@LiveWallpaperService
-            val prevUriSet = svc.rawImages.map { it.toString() }.toHashSet()
-            svc.scanJob?.cancel()
-            svc.scanJob = svc.serviceScope.launch {
-                // 1. Rescan folders
-                val scanned = ImageScanner.scanToCache(svc, prefs)
-                val newUriSet = scanned.map { it.toString() }.toHashSet()
-
-                // Prune deleted images from faceCache (memory cleanup)
-                val deleted = prevUriSet - newUriSet
-                deleted.forEach { svc.faceCache.remove(it) }
-
-                svc.rawImages = scanned
-                svc.images = svc.applySort(prefs)
-                svc.scanComplete = true
-
-                if (prefs.facesOnlyEnabled) {
-                    // startFaceScan rebuilds facesOnlyImages from cache (skips known images)
-                    // and scans any new images not yet in faceCache
-                    svc.startFaceScan {
-                        portraitCellIndices = IntArray(0)
-                        landscapeCellIndices = IntArray(0)
-                        scope.launch { reloadAllBitmaps() }
-                    }
-                } else {
-                    // Clear any leftover face data from a previous Faces Only session
-                    if (svc.faceCache.isNotEmpty() || svc.facesOnlyImages.isNotEmpty()) {
-                        svc.faceCache.clear()
-                        svc.facesOnlyImages = emptyList()
-                        svc.clearFacesOnlyCache()
-                    }
-                    scope.launch { reloadAllBitmaps() }
-                }
-            }
-        }
-
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
             when (key) {
                 AppPreferences.KEY_FOLDER_URIS -> {
@@ -629,23 +592,41 @@ class LiveWallpaperService : WallpaperService() {
                 }
 
                 AppPreferences.KEY_FACES_ONLY -> {
+                    val svc = this@LiveWallpaperService
                     if (prefs.facesOnlyEnabled) {
-                        this@LiveWallpaperService.startFaceScan {
-                            portraitCellIndices = IntArray(0)
-                            landscapeCellIndices = IntArray(0)
-                            scope.launch { reloadAllBitmaps() }
+                        // If a URI scan is still running, don't start the face scan now —
+                        // the scan completion callback checks facesOnlyEnabled and picks it up.
+                        if (svc.scanJob?.isActive != true && svc.images.isNotEmpty()) {
+                            svc.startFaceScan {
+                                portraitCellIndices = IntArray(0)
+                                landscapeCellIndices = IntArray(0)
+                                scope.launch { reloadAllBitmaps() }
+                            }
                         }
                     } else {
-                        this@LiveWallpaperService.faceScanJob?.cancel()
-                        this@LiveWallpaperService.facesOnlyImages = emptyList()
+                        svc.faceScanJob?.cancel()
+                        svc.facesOnlyImages = emptyList()
+                        svc.clearFacesOnlyCache()
                         scope.launch { reloadAllBitmaps() }
                     }
                 }
 
-                AppPreferences.KEY_SMART_RESCAN -> {
-                    if (prefs.smartRescan) {
-                        prefs.smartRescan = false
-                        doSmartRescan(prefs)
+                AppPreferences.KEY_RESCAN -> {
+                    if (prefs.rescan) {
+                        prefs.rescan = false
+                        val svc = this@LiveWallpaperService
+                        // Cancel any running jobs and wipe all cached data
+                        svc.scanJob?.cancel()
+                        svc.faceScanJob?.cancel()
+                        svc.faceCache.clear()
+                        svc.facesOnlyImages = emptyList()
+                        svc.clearFacesOnlyCache()
+                        try { ImageScanner.cacheFile(svc).delete() } catch (_: Exception) {}
+                        svc.rawImages = emptyList()
+                        svc.images = emptyList()
+                        svc.scanComplete = false
+                        // Fresh scan — startLoading will check facesOnlyEnabled on completion
+                        startLoading()
                     }
                 }
 

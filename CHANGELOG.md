@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.2.2] — 2026-04-12
+
+### Added
+- **About page** — links to source code, issue tracker, privacy policy, and license; lists third-party libraries with on-device processing note for ML Kit
+- **Bottom navigation bar** — Folders, Layout, Settings, and About tabs always visible
+
+### Changed
+- Rescan button fully invalidates all caches (URI index, face cache, in-memory data) and restarts from scratch
+- Disabling Faces Only now also clears the face cache from disk
+- Scan indicator redesigned: spinner stacked above label, both right-aligned in the toolbar header
+- Indeterminate spinner (URI scan) now shows a background track ring with gap and rounded ends, matching the face scan indicator style
+- Scan labels updated to "Creating Index" and "Searching faces"
+- Material Components updated to 1.13.0 (M3 Expressive progress indicators)
+
+### Fixed
+- Adding a folder or tapping Rescan on a fresh install (wallpaper not yet active) now correctly triggers a scan
+
 ## [1.2.1] — 2026-04-11
 
 ### Added

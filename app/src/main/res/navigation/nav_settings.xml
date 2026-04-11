@@ -20,4 +20,9 @@
         android:name="com.gomaed.photoslide.ui.settings.GeneralSettingsFragment"
         android:label="@string/nav_settings_title" />
 
+    <fragment
+        android:id="@+id/aboutFragment"
+        android:name="com.gomaed.photoslide.ui.about.AboutFragment"
+        android:label="@string/nav_about" />
+
 </navigation>

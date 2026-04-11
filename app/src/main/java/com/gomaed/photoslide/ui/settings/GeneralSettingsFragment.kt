@@ -309,7 +309,7 @@ class GeneralSettingsFragment : Fragment() {
         val swatchSize = 48.dpToPx()
         val margin = 8.dpToPx()
         val outline = resolveAttrColor(com.google.android.material.R.attr.colorOutline)
-        val primary = resolveAttrColor(com.google.android.material.R.attr.colorPrimary)
+        val primary = resolveAttrColor(androidx.appcompat.R.attr.colorPrimary)
 
         val grid = GridLayout(requireContext()).apply {
             columnCount = 4

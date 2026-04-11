@@ -39,7 +39,7 @@ class AppPreferences(context: Context) {
         const val KEY_FADE_DURATION = "fade_duration"
         const val KEY_CENTER_FACES  = "center_faces"
         const val KEY_FACES_ONLY    = "faces_only"
-        const val KEY_SMART_RESCAN  = "smart_rescan"
+        const val KEY_RESCAN        = "rescan"
     }
 
     var selectedFolderUris: Set<String>
@@ -112,9 +112,9 @@ class AppPreferences(context: Context) {
         set(value) { prefs.edit().putBoolean(KEY_FACES_ONLY, value).apply() }
 
     // Pulsed true by the Rescan FAB; service resets to false after handling
-    var smartRescan: Boolean
-        get() = prefs.getBoolean(KEY_SMART_RESCAN, false)
-        set(value) { prefs.edit().putBoolean(KEY_SMART_RESCAN, value).apply() }
+    var rescan: Boolean
+        get() = prefs.getBoolean(KEY_RESCAN, false)
+        set(value) { prefs.edit().putBoolean(KEY_RESCAN, value).apply() }
 
     // 50 = no stagger (50/50), 70 = max stagger (70/30)
     var staggerRatio: Int

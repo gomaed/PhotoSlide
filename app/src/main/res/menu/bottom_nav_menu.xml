@@ -16,4 +16,9 @@
         android:icon="@drawable/ic_folder_open"
         android:title="@string/nav_folders" />
 
+    <item
+        android:id="@+id/aboutFragment"
+        android:icon="@drawable/ic_info"
+        android:title="@string/nav_about" />
+
 </menu>

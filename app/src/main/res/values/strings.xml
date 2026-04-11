@@ -13,7 +13,7 @@
     <string name="no_folders_selected">No Folders Selected.\nTap + to Add a Folder.</string>
     <string name="add_folder">Add New</string>
     <string name="rescan_folders">Rescan</string>
-    <string name="scanning_folders">Loading…</string>
+    <string name="scanning_folders">Creating Index</string>
     <string name="no_pictures_selected">No Pictures Selected</string>
     <string name="loading">Loading…</string>
     <string name="remove_folder">Remove Folder</string>
@@ -65,5 +65,22 @@
     <string name="faces_only_desc">Only show photos where a face is detected</string>
     <string name="faces_only_warning_title">Face Analysis Required</string>
     <string name="faces_only_warning_message">Enabling this feature will scan your entire photo library for faces. This can take several minutes depending on the size of your library.\n\nThe wallpaper will continue showing photos while the scan runs in the background.</string>
-    <string name="scanning_faces">Analysing…</string>
+    <string name="scanning_faces">Searching faces</string>
+
+    <!-- Bottom nav — About -->
+    <string name="nav_about">About</string>
+
+    <!-- About screen -->
+    <string name="about_tagline">Thanks for using PhotoSlide</string>
+    <string name="about_section_connect">Connect</string>
+    <string name="about_source_code">Source Code</string>
+    <string name="about_report_issue">Report an Issue</string>
+    <string name="about_section_legal">Legal</string>
+    <string name="about_privacy">Privacy Policy</string>
+    <string name="about_license">License</string>
+    <string name="about_section_libraries">Third-Party Libraries</string>
+    <string name="about_mlkit_title">ML Kit Face Detection</string>
+    <string name="about_mlkit_desc">Google — Runs entirely on-device, no data leaves your phone</string>
+    <string name="about_section_app">App</string>
+    <string name="about_version">Version</string>
 </resources>

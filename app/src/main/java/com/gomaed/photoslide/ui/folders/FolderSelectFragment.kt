@@ -51,7 +51,8 @@ class FolderSelectFragment : Fragment() {
         }
 
         binding.fabRescan.setOnClickListener {
-            triggerScan()
+            prefs.rescan = true   // full invalidation in the service (if running)
+            scanFolders()         // direct scan fallback when service is not running
         }
 
         loadFolders()
@@ -82,7 +83,7 @@ class FolderSelectFragment : Fragment() {
         uris.add(uri.toString())
         prefs.selectedFolderUris = uris
         loadFolders()
-        triggerScan()
+        scanFolders()
     }
 
     private fun removeFolder(uri: Uri) {
@@ -90,11 +91,13 @@ class FolderSelectFragment : Fragment() {
         uris.remove(uri.toString())
         prefs.selectedFolderUris = uris
         loadFolders()
-        triggerScan()
+        scanFolders()
     }
 
-    private fun triggerScan() {
-        prefs.smartRescan = true
+    private fun scanFolders() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            ImageScanner.scanToCache(requireContext(), prefs)
+        }
     }
 
     override fun onDestroyView() {

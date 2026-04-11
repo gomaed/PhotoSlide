@@ -13,7 +13,7 @@
     <string name="no_folders_selected">Keine Ordner ausgewählt.\nTippe auf +, um einen Ordner hinzuzufügen.</string>
     <string name="add_folder">Hinzufügen</string>
     <string name="rescan_folders">Neu scannen</string>
-    <string name="scanning_folders">Lade…</string>
+    <string name="scanning_folders">Erstelle Index</string>
     <string name="no_pictures_selected">Keine Bilder ausgewählt</string>
     <string name="loading">Lade…</string>
     <string name="remove_folder">Ordner entfernen</string>
@@ -65,5 +65,22 @@
     <string name="faces_only_desc">Nur Fotos anzeigen, auf denen ein Gesicht erkannt wurde</string>
     <string name="faces_only_warning_title">Gesichtsanalyse erforderlich</string>
     <string name="faces_only_warning_message">Diese Funktion scannt deine gesamte Fotobibliothek nach Gesichtern. Je nach Größe der Bibliothek kann das mehrere Minuten dauern.\n\nDas Hintergrundbild zeigt weiterhin Fotos, während der Scan im Hintergrund läuft.</string>
-    <string name="scanning_faces">Analysiere…</string>
+    <string name="scanning_faces">Suche Gesichter</string>
+
+    <!-- Bottom nav — About -->
+    <string name="nav_about">Über</string>
+
+    <!-- About screen -->
+    <string name="about_tagline">Danke, dass du PhotoSlide verwendest</string>
+    <string name="about_section_connect">Verbinden</string>
+    <string name="about_source_code">Quellcode</string>
+    <string name="about_report_issue">Fehler melden</string>
+    <string name="about_section_legal">Rechtliches</string>
+    <string name="about_privacy">Datenschutzerklärung</string>
+    <string name="about_license">Lizenz</string>
+    <string name="about_section_libraries">Drittanbieter-Bibliotheken</string>
+    <string name="about_mlkit_title">ML Kit Face Detection</string>
+    <string name="about_mlkit_desc">Google — Läuft vollständig auf dem Gerät, keine Daten verlassen dein Smartphone</string>
+    <string name="about_section_app">App</string>
+    <string name="about_version">Version</string>
 </resources>
