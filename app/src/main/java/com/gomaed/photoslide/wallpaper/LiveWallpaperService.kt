@@ -15,14 +15,12 @@ import android.os.HandlerThread
 import android.os.SystemClock
 import android.provider.DocumentsContract
 import android.service.wallpaper.WallpaperService
+import com.gomaed.photoslide.data.AppPreferences
+import com.gomaed.photoslide.data.FaceScanner
 import com.gomaed.photoslide.data.ImageScanner
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.SurfaceHolder
-import com.gomaed.photoslide.data.AppPreferences
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,58 +29,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.resume
 
 class LiveWallpaperService : WallpaperService() {
-
-    // ── Face detection ────────────────────────────────────────────────────────
-    // Results cached by URI so detection only runs once per image.
-    // PointF(-1,-1) is used as a sentinel for "no faces detected".
-    private val faceCache: MutableMap<String, android.graphics.PointF> =
-        java.util.Collections.synchronizedMap(
-            object : java.util.LinkedHashMap<String, android.graphics.PointF>(1024, 0.75f, true) {
-                override fun removeEldestEntry(eldest: Map.Entry<String, android.graphics.PointF>) = size > 1000
-            }
-        )
-    private val faceDetector by lazy {
-        FaceDetection.getClient(
-            FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
-                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
-                .setMinFaceSize(0.1f)
-                .build()
-        )
-    }
-
-    suspend fun detectFocusPoint(bitmap: Bitmap, uri: Uri): android.graphics.PointF? {
-        val key = uri.toString()
-        faceCache[key]?.let { return if (it.x < 0f) null else it }
-        return try {
-            val image = InputImage.fromBitmap(bitmap, 0)
-            val faces = suspendCancellableCoroutine { cont ->
-                faceDetector.process(image)
-                    .addOnSuccessListener { cont.resume(it) }
-                    .addOnFailureListener { cont.resume(emptyList()) }
-            }
-            val focus = if (faces.isEmpty()) null else {
-                val l = faces.minOf { it.boundingBox.left }
-                val t = faces.minOf { it.boundingBox.top }
-                val r = faces.maxOf { it.boundingBox.right }
-                val b = faces.maxOf { it.boundingBox.bottom }
-                android.graphics.PointF(
-                    (l + r) / 2f / bitmap.width,
-                    (t + b) / 2f / bitmap.height
-                )
-            }
-            faceCache[key] = focus ?: android.graphics.PointF(-1f, -1f)
-            focus
-        } catch (_: Exception) { null }
-    }
 
     // ── Service-level image pool ──────────────────────────────────────────────
     // Shared across all engine instances (homescreen + preview).
@@ -96,106 +46,16 @@ class LiveWallpaperService : WallpaperService() {
 
     // ── Faces-only filter ─────────────────────────────────────────────────────
     @Volatile var facesOnlyImages: List<Uri> = emptyList()
-    private var faceScanJob: Job? = null
 
     /** The image pool engines should use — respects the faces-only toggle. */
     val effectiveImages: List<Uri>
         get() = if (servicePrefs.facesOnlyEnabled && facesOnlyImages.isNotEmpty()) facesOnlyImages
                 else images
 
-    /** Scan every image at low resolution and populate [facesOnlyImages].
-     *  Calls [onComplete] on the main thread when finished.
-     *  Shows the toolbar scan spinner in SettingsActivity while running. */
-    fun startFaceScan(onComplete: (List<Uri>) -> Unit) {
-        faceScanJob?.cancel()
-        servicePrefs.isFaceScanning = true
-        servicePrefs.faceScanProgress = 0
-        faceScanJob = serviceScope.launch {
-            try {
-                val allImages = images
-                val total = allImages.size
-                val faceImages = mutableListOf<Uri>()
-                var processed = 0
-                var lastPercent = -1
-                for (uri in allImages) {
-                    if (!isActive) break
-                    val key = uri.toString()
-                    val cached = faceCache[key]
-                    if (cached != null) {
-                        if (cached.x >= 0f) faceImages.add(uri)
-                    } else {
-                        val bmp = decodeSmallBitmap(uri)
-                        if (bmp != null) {
-                            val focus = detectFocusPoint(bmp, uri)
-                            bmp.recycle()
-                            if (focus != null) faceImages.add(uri)
-                        }
-                    }
-                    processed++
-                    if (total > 0) {
-                        val percent = processed * 100 / total
-                        if (percent != lastPercent) {
-                            lastPercent = percent
-                            servicePrefs.faceScanProgress = percent
-                        }
-                    }
-                }
-                facesOnlyImages = faceImages
-                withContext(Dispatchers.IO) { saveFacesOnlyCache(faceImages) }
-                withContext(Dispatchers.Main) { onComplete(faceImages) }
-            } finally {
-                servicePrefs.isFaceScanning = false
-            }
-        }
-    }
-
-    // ── Faces-only disk cache ─────────────────────────────────────────────────
-    // Survives reboots. Invalidated whenever folders change (hash mismatch).
-
-    private fun facesOnlyCacheFile() = java.io.File(filesDir, "faces_only_cache.txt")
-
-    private fun saveFacesOnlyCache(uris: List<Uri>) {
-        try {
-            facesOnlyCacheFile().bufferedWriter().use { w ->
-                w.write(ImageScanner.folderHash(servicePrefs)); w.newLine()
-                uris.forEach { w.write(it.toString()); w.newLine() }
-            }
-        } catch (_: Exception) {}
-    }
-
-    private fun loadFacesOnlyCache(): List<Uri>? = try {
-        val file = facesOnlyCacheFile()
-        if (!file.exists()) null
-        else {
-            val lines = file.readLines()
-            if (lines.isEmpty() || lines[0] != ImageScanner.folderHash(servicePrefs)) null
-            else lines.drop(1).filter { it.isNotBlank() }.map { Uri.parse(it) }
-        }
-    } catch (_: Exception) { null }
-
-    private fun clearFacesOnlyCache() {
-        try { facesOnlyCacheFile().delete() } catch (_: Exception) {}
-    }
-
-    private suspend fun decodeSmallBitmap(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
-        try {
-            val source = ImageDecoder.createSource(contentResolver, uri)
-            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                val scale = 320f / maxOf(info.size.width, info.size.height)
-                if (scale < 1f) decoder.setTargetSize(
-                    (info.size.width * scale).toInt(),
-                    (info.size.height * scale).toInt()
-                )
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            }
-        } catch (_: Exception) { null }
-    }
-
     override fun onCreateEngine(): Engine = WallpaperEngine()
 
     override fun onDestroy() {
         super.onDestroy()
-        faceScanJob?.cancel()
         serviceScope.cancel()
     }
 
@@ -218,6 +78,10 @@ class LiveWallpaperService : WallpaperService() {
                 scanComplete = true
                 images = applySort(prefs)
                 onReady()
+            } else if (ImageScanner.isScanning) {
+                // A fragment-triggered scan is already writing the cache — don't start a
+                // duplicate. KEY_URI_CACHE_UPDATED will fire when it finishes and the
+                // engine will call startLoading() to retry with the fresh cache.
             } else {
                 rescan(prefs, silent = false, onComplete = onReady)
             }
@@ -235,9 +99,9 @@ class LiveWallpaperService : WallpaperService() {
         rawImages = emptyList()
         images = emptyList()
         facesOnlyImages = emptyList()
-        clearFacesOnlyCache()
+        FaceScanner.clearCache(this)
+        FaceScanner.cancelScan()
         scanJob?.cancel()
-        faceScanJob?.cancel()
     }
 
     private fun applySort(prefs: AppPreferences): List<Uri> = when (prefs.sortOrder) {
@@ -269,6 +133,8 @@ class LiveWallpaperService : WallpaperService() {
         private lateinit var handler: Handler
         private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
         private val prefs by lazy { AppPreferences(this@LiveWallpaperService) }
+
+        private var refreshJob: Job? = null
 
         private var cellIndices: IntArray = IntArray(0)
         private var portraitCellIndices: IntArray = IntArray(0)
@@ -536,8 +402,10 @@ class LiveWallpaperService : WallpaperService() {
             if (visible) {
                 if (this@LiveWallpaperService.images.isEmpty()) {
                     startLoading()
-                } else {
-                    scope.launch { refreshBitmaps() }
+                } else if (refreshJob?.isActive != true) {
+                    // onSurfaceChanged already launched a refresh during rotation — skip the
+                    // duplicate so the two decodes don't race each other and cause jank.
+                    refreshJob = scope.launch { refreshBitmaps() }
                 }
                 scheduleNextAdvance()
             } else {
@@ -556,7 +424,8 @@ class LiveWallpaperService : WallpaperService() {
             surfaceWidth = width
             surfaceHeight = height
             if (this@LiveWallpaperService.images.isNotEmpty()) {
-                scope.launch { refreshBitmaps() }
+                refreshJob?.cancel()
+                refreshJob = scope.launch { refreshBitmaps() }
             } else {
                 startLoading()
             }
@@ -592,26 +461,27 @@ class LiveWallpaperService : WallpaperService() {
                 AppPreferences.KEY_GRID_CORNER_RADIUS -> drawFrame()
 
                 AppPreferences.KEY_CENTER_FACES -> {
-                    if (prefs.centerFacesEnabled) scope.launch { reloadAllBitmaps() }
-                    else drawFrame()
+                    if (prefs.centerFacesEnabled) {
+                        // Sync saved indices from live state so reloadAllBitmaps() keeps
+                        // the same images visible — just re-decoded with face-centering.
+                        if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
+                        else portraitCellIndices = cellIndices.copyOf()
+                        scope.launch { reloadAllBitmaps() }
+                    } else drawFrame()
                 }
 
                 AppPreferences.KEY_FACES_ONLY -> {
                     val svc = this@LiveWallpaperService
                     if (prefs.facesOnlyEnabled) {
-                        // If a URI scan is still running, don't start the face scan now —
-                        // the scan completion callback checks facesOnlyEnabled and picks it up.
-                        if (svc.scanJob?.isActive != true && svc.images.isNotEmpty()) {
-                            svc.startFaceScan {
-                                portraitCellIndices = IntArray(0)
-                                landscapeCellIndices = IntArray(0)
-                                scope.launch { reloadAllBitmaps() }
-                            }
+                        // Only start a new scan if no URI scan and no face scan are running.
+                        if (svc.scanJob?.isActive != true && svc.images.isNotEmpty()
+                            && !FaceScanner.isScanning) {
+                            FaceScanner.startScan(svc, svc.images, prefs)
                         }
                     } else {
-                        svc.faceScanJob?.cancel()
+                        FaceScanner.cancelScan()
                         svc.facesOnlyImages = emptyList()
-                        svc.clearFacesOnlyCache()
+                        FaceScanner.clearCache(svc)
                         scope.launch { reloadAllBitmaps() }
                     }
                 }
@@ -622,16 +492,47 @@ class LiveWallpaperService : WallpaperService() {
                         val svc = this@LiveWallpaperService
                         // Cancel any running jobs and wipe all cached data
                         svc.scanJob?.cancel()
-                        svc.faceScanJob?.cancel()
-                        svc.faceCache.clear()
+                        FaceScanner.cancelScan()
+                        FaceScanner.faceCache.clear()
                         svc.facesOnlyImages = emptyList()
-                        svc.clearFacesOnlyCache()
+                        FaceScanner.clearCache(svc)
                         try { ImageScanner.cacheFile(svc).delete() } catch (_: Exception) {}
                         svc.rawImages = emptyList()
                         svc.images = emptyList()
                         svc.scanComplete = false
                         // Fresh scan — startLoading will check facesOnlyEnabled on completion
                         startLoading()
+                    }
+                }
+
+                AppPreferences.KEY_URI_CACHE_UPDATED -> {
+                    // ImageScanner.startScan() just wrote the cache. If the engine is still
+                    // waiting for images (ensureImages skipped rescan while scan was running),
+                    // retry now that the cache is ready.
+                    if (this@LiveWallpaperService.images.isEmpty()) {
+                        startLoading()
+                    }
+                }
+
+                AppPreferences.KEY_FACE_CACHE_UPDATED -> {
+                    // FaceScanner finished a scan (from fragment or service path).
+                    // Reload facesOnlyImages from the freshly written cache and redraw,
+                    // but only if no scan is currently running.
+                    val svc = this@LiveWallpaperService
+                    if (prefs.facesOnlyEnabled &&
+                        !FaceScanner.isScanning &&
+                        svc.images.isNotEmpty()) {
+                        scope.launch {
+                            val cached = withContext(Dispatchers.IO) {
+                                FaceScanner.loadCache(svc, prefs)
+                            }
+                            if (cached != null) {
+                                svc.facesOnlyImages = cached
+                                portraitCellIndices = IntArray(0)
+                                landscapeCellIndices = IntArray(0)
+                                reloadAllBitmaps()
+                            }
+                        }
                     }
                 }
 
@@ -643,6 +544,22 @@ class LiveWallpaperService : WallpaperService() {
 
         // Start the loading sequence: show spinner, then decode once images are ready.
         private fun startLoading() {
+            // A rescan may have been requested while the engine was not running
+            // (prefs.rescan = true was never handled because no listener was registered).
+            // Honour it now so caches are wiped and a fresh face scan will follow.
+            if (prefs.rescan) {
+                prefs.rescan = false
+                val svc = this@LiveWallpaperService
+                svc.scanJob?.cancel()
+                FaceScanner.cancelScan()
+                FaceScanner.faceCache.clear()
+                svc.facesOnlyImages = emptyList()
+                FaceScanner.clearCache(svc)
+                try { ImageScanner.cacheFile(svc).delete() } catch (_: Exception) {}
+                svc.rawImages = emptyList()
+                svc.images = emptyList()
+                svc.scanComplete = false
+            }
             portraitCellIndices = IntArray(0)
             landscapeCellIndices = IntArray(0)
             advanceCellPos = 0
@@ -651,20 +568,22 @@ class LiveWallpaperService : WallpaperService() {
             this@LiveWallpaperService.ensureImages(prefs) {
                 scope.launch {
                     if (prefs.facesOnlyEnabled) {
+                        val svc = this@LiveWallpaperService
                         val cached = withContext(Dispatchers.IO) {
-                            this@LiveWallpaperService.loadFacesOnlyCache()
+                            FaceScanner.loadCache(svc, prefs)
                         }
                         if (cached != null) {
                             // Restore from disk — no scan needed, instant startup
-                            this@LiveWallpaperService.facesOnlyImages = cached
+                            svc.facesOnlyImages = cached
                             reloadAllBitmaps()
                         } else {
                             // No valid cache — show full set immediately, scan in background
                             reloadAllBitmaps()
-                            this@LiveWallpaperService.startFaceScan {
-                                portraitCellIndices = IntArray(0)
-                                landscapeCellIndices = IntArray(0)
-                                scope.launch { reloadAllBitmaps() }
+                            // Don't interrupt a scan already in progress (e.g. started from
+                            // the fragment before the wallpaper was set). KEY_FACE_CACHE_UPDATED
+                            // will trigger a reload when it finishes.
+                            if (!FaceScanner.isScanning) {
+                                FaceScanner.startScan(svc, svc.images, prefs)
                             }
                         }
                     } else {
@@ -714,7 +633,7 @@ class LiveWallpaperService : WallpaperService() {
                             val r = rects[i]
                             val bmp = try { decodeSampledBitmap(imgs[cellIndices[i]], r.width().toInt(), r.height().toInt()) }
                                       catch (_: Exception) { null }
-                            val focus = if (bmp != null && prefs.centerFacesEnabled) detectFocusPoint(bmp, imgs[cellIndices[i]]) else null
+                            val focus = if (bmp != null && prefs.centerFacesEnabled) FaceScanner.detectFocus(this@LiveWallpaperService, imgs[cellIndices[i]]) else null
                             bmp to focus
                         }
                     }.awaitAll()
@@ -754,7 +673,7 @@ class LiveWallpaperService : WallpaperService() {
                             val r = rects[i]
                             val bmp = try { decodeSampledBitmap(imgs[cellIndices[i]], r.width().toInt(), r.height().toInt()) }
                                       catch (_: Exception) { null }
-                            val focus = if (bmp != null && prefs.centerFacesEnabled) detectFocusPoint(bmp, imgs[cellIndices[i]]) else null
+                            val focus = if (bmp != null && prefs.centerFacesEnabled) FaceScanner.detectFocus(this@LiveWallpaperService, imgs[cellIndices[i]]) else null
                             bmp to focus
                         }
                     }.awaitAll()
@@ -803,7 +722,7 @@ class LiveWallpaperService : WallpaperService() {
                 try { decodeSampledBitmap(imgs[imageIdx], r.width().toInt(), r.height().toInt()) }
                 catch (_: Exception) { null }
             }
-            val newFocus = if (newBitmap != null && prefs.centerFacesEnabled) detectFocusPoint(newBitmap, imgs[imageIdx]) else null
+            val newFocus = if (newBitmap != null && prefs.centerFacesEnabled) FaceScanner.detectFocus(this@LiveWallpaperService, imgs[imageIdx]) else null
             val oldFocus = focusPoints.getOrNull(cellPos)
             if (cellPos < focusPoints.size) focusPoints[cellPos] = newFocus
             if (cellPos < fadingFocusPoints.size) fadingFocusPoints[cellPos] = oldFocus

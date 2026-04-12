@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.4] — 2026-04-12
+
+### Fixed
+- Enabling Center Faces no longer resets visible photos to the initial selection — the current photos are now re-decoded in-place with face centering applied
+- Rotating the device no longer causes a brief animation glitch — a second redundant bitmap decode that raced against the first (triggered by both `onSurfaceChanged` and `onVisibilityChanged`) is now suppressed
+- URI scan started from the Folders tab no longer runs forever if the app is exited mid-scan; `isScanning` flag is now always cleared via `try/finally`
+- URI scan and face scan launched from the Folders tab now survive app backgrounding and navigation — both run in their own persistent scopes instead of the fragment view lifecycle
+- Setting the wallpaper no longer triggers a duplicate URI scan when a fragment-triggered scan is already in progress; the service now waits for the running scan to complete via a `uriCacheUpdated` signal
+- Face detection on cache miss now runs on a ≤320 px thumbnail (same as bulk scan) instead of the full display-resolution bitmap, making the first rotation to a new orientation significantly faster when Center Faces is enabled
+
 ## [1.2.3] — 2026-04-12
 
 ### Fixed

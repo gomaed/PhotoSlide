@@ -39,7 +39,13 @@ class AppPreferences(context: Context) {
         const val KEY_FADE_DURATION = "fade_duration"
         const val KEY_CENTER_FACES  = "center_faces"
         const val KEY_FACES_ONLY    = "faces_only"
-        const val KEY_RESCAN        = "rescan"
+        const val KEY_RESCAN             = "rescan"
+        // Incremented by ImageScanner.startScan() when a fragment-triggered URI scan
+        // finishes; the wallpaper engine listens to retry ensureImages() without racing.
+        const val KEY_URI_CACHE_UPDATED  = "uri_cache_updated"
+        // Incremented by FaceScanner when an external scan finishes; the wallpaper
+        // engine listens for changes to reload facesOnlyImages from disk.
+        const val KEY_FACE_CACHE_UPDATED = "face_cache_updated"
     }
 
     var selectedFolderUris: Set<String>
@@ -115,6 +121,14 @@ class AppPreferences(context: Context) {
     var rescan: Boolean
         get() = prefs.getBoolean(KEY_RESCAN, false)
         set(value) { prefs.edit().putBoolean(KEY_RESCAN, value).apply() }
+
+    var uriCacheUpdated: Int
+        get() = prefs.getInt(KEY_URI_CACHE_UPDATED, 0)
+        set(value) { prefs.edit().putInt(KEY_URI_CACHE_UPDATED, value).apply() }
+
+    var faceCacheUpdated: Int
+        get() = prefs.getInt(KEY_FACE_CACHE_UPDATED, 0)
+        set(value) { prefs.edit().putInt(KEY_FACE_CACHE_UPDATED, value).apply() }
 
     // 50 = no stagger (50/50), 70 = max stagger (70/30)
     var staggerRatio: Int

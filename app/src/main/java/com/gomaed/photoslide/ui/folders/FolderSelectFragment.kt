@@ -9,12 +9,10 @@ import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.gomaed.photoslide.data.AppPreferences
 import com.gomaed.photoslide.data.ImageScanner
 import com.gomaed.photoslide.databinding.FragmentFolderSelectBinding
-import kotlinx.coroutines.launch
 
 class FolderSelectFragment : Fragment() {
 
@@ -95,9 +93,9 @@ class FolderSelectFragment : Fragment() {
     }
 
     private fun scanFolders() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            ImageScanner.scanToCache(requireContext(), prefs)
-        }
+        // Runs in ImageScanner's own persistent scope — survives navigation and app
+        // backgrounding. Automatically chains to FaceScanner when facesOnlyEnabled.
+        ImageScanner.startScan(requireContext().applicationContext, prefs)
     }
 
     override fun onDestroyView() {
