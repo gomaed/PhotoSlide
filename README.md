@@ -39,11 +39,11 @@ PhotoSlide is an Android live wallpaper that turns your photo library into a dyn
 
 <table>
   <tr>
-    <td><img src="Screenshots/Screenshot_20260404-174113.png" width="150" alt="Live Wallpaper"/></td>
-    <td><img src="Screenshots/Screenshot_20260404-174324.png" width="150" alt="Live Wallpaper 2"/></td>
-    <td><img src="Screenshots/Screenshot_20260404-173857.png" width="150" alt="Settings"/></td>
-    <td><img src="Screenshots/Screenshot_20260404-173908.png" width="150" alt="Layout Selection"/></td>
-    <td><img src="Screenshots/Screenshot_20260404-174026.png" width="150" alt="Folder Selection"/></td>
+    <td><img src="Screenshots/Screenshot_20260412_113754.png" width="150" alt="Live Wallpaper"/></td>
+    <td><img src="Screenshots/Screenshot_20260412_113916.png" width="150" alt="Live Wallpaper 2"/></td>
+    <td><img src="Screenshots/Screenshot_20260412_113936.png" width="150" alt="Settings"/></td>
+    <td><img src="Screenshots/Screenshot_20260412_113947.png" width="150" alt="Layout Selection"/></td>
+    <td><img src="Screenshots/Screenshot_20260412_113953.png" width="150" alt="Folder Selection"/></td>
   </tr>
 </table>
 
