@@ -14,8 +14,8 @@ android {
         applicationId = "com.gomaed.photoslide"
         minSdk = 29
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.2.2"
+        versionCode = 10
+        versionName = "1.2.3"
 
     }
 

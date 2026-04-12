@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.3] — 2026-04-12
+
+### Fixed
+- Face focus-point cache (Center Faces) is now capped at 1000 entries with LRU eviction, preventing unbounded RAM growth on devices that run for a long time without a reboot
+
 ## [1.2.2] — 2026-04-12
 
 ### Added

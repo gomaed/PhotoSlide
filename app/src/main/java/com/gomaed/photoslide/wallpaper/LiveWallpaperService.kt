@@ -42,7 +42,12 @@ class LiveWallpaperService : WallpaperService() {
     // ── Face detection ────────────────────────────────────────────────────────
     // Results cached by URI so detection only runs once per image.
     // PointF(-1,-1) is used as a sentinel for "no faces detected".
-    private val faceCache = java.util.concurrent.ConcurrentHashMap<String, android.graphics.PointF>()
+    private val faceCache: MutableMap<String, android.graphics.PointF> =
+        java.util.Collections.synchronizedMap(
+            object : java.util.LinkedHashMap<String, android.graphics.PointF>(1024, 0.75f, true) {
+                override fun removeEldestEntry(eldest: Map.Entry<String, android.graphics.PointF>) = size > 1000
+            }
+        )
     private val faceDetector by lazy {
         FaceDetection.getClient(
             FaceDetectorOptions.Builder()
@@ -865,25 +870,11 @@ class LiveWallpaperService : WallpaperService() {
 
             bitmaps.forEachIndexed { idx, bitmap ->
                 if (idx >= rects.size) return@forEachIndexed
-                val r = rects[idx]
                 val col = idx % cols; val row = idx / cols
-                val dest = RectF(
-                    if (col > 0) r.left + spacing else r.left,
-                    if (row > 0) r.top + spacing else r.top,
-                    if (col < cols - 1) r.right - spacing else r.right,
-                    if (row < rows - 1) r.bottom - spacing else r.bottom
-                )
+                val dest = cellDest(rects[idx], col, row, cols, rows, spacing)
 
                 canvas.save()
-                if (cornerRadius > 0f) {
-                    val tlR = if (col > 0 && row > 0) cornerRadius else 0f
-                    val trR = if (col < cols - 1 && row > 0) cornerRadius else 0f
-                    val brR = if (col < cols - 1 && row < rows - 1) cornerRadius else 0f
-                    val blR = if (col > 0 && row < rows - 1) cornerRadius else 0f
-                    canvas.clipPath(Path().apply {
-                        addRoundRect(dest, floatArrayOf(tlR, tlR, trR, trR, brR, brR, blR, blR), Path.Direction.CW)
-                    })
-                }
+                canvas.clipRoundedCell(dest, col, row, cols, rows, cornerRadius)
 
                 val alpha = fadeAlphas.getOrElse(idx) { 1f }
                 val fading = fadingBitmaps.getOrNull(idx)
@@ -905,28 +896,15 @@ class LiveWallpaperService : WallpaperService() {
                     canvas.drawRect(dest, placeholderPaint)
                 }
 
-                    canvas.restore()
+                canvas.restore()
             }
 
             if (bitmaps.isEmpty()) {
                 rects.forEachIndexed { idx, r ->
                     val col = idx % cols; val row = idx / cols
-                    val dest = RectF(
-                        if (col > 0) r.left + spacing else r.left,
-                        if (row > 0) r.top + spacing else r.top,
-                        if (col < cols - 1) r.right - spacing else r.right,
-                        if (row < rows - 1) r.bottom - spacing else r.bottom
-                    )
+                    val dest = cellDest(r, col, row, cols, rows, spacing)
                     canvas.save()
-                    if (cornerRadius > 0f) {
-                        val tlR = if (col > 0 && row > 0) cornerRadius else 0f
-                        val trR = if (col < cols - 1 && row > 0) cornerRadius else 0f
-                        val brR = if (col < cols - 1 && row < rows - 1) cornerRadius else 0f
-                        val blR = if (col > 0 && row < rows - 1) cornerRadius else 0f
-                        canvas.clipPath(Path().apply {
-                            addRoundRect(dest, floatArrayOf(tlR, tlR, trR, trR, brR, brR, blR, blR), Path.Direction.CW)
-                        })
-                    }
+                    canvas.clipRoundedCell(dest, col, row, cols, rows, cornerRadius)
                     placeholderPaint.color = placeholderColors[idx % 4]
                     canvas.drawRect(dest, placeholderPaint)
                     canvas.restore()
@@ -935,6 +913,24 @@ class LiveWallpaperService : WallpaperService() {
 
             if (!isLoading && images.isEmpty()) drawNoImagesLabel(canvas)
             if (isLoading) drawLoadingPill(canvas)
+        }
+
+        private fun cellDest(r: RectF, col: Int, row: Int, cols: Int, rows: Int, spacing: Float) = RectF(
+            if (col > 0) r.left + spacing else r.left,
+            if (row > 0) r.top + spacing else r.top,
+            if (col < cols - 1) r.right - spacing else r.right,
+            if (row < rows - 1) r.bottom - spacing else r.bottom
+        )
+
+        private fun Canvas.clipRoundedCell(dest: RectF, col: Int, row: Int, cols: Int, rows: Int, cornerRadius: Float) {
+            if (cornerRadius <= 0f) return
+            val tlR = if (col > 0 && row > 0) cornerRadius else 0f
+            val trR = if (col < cols - 1 && row > 0) cornerRadius else 0f
+            val brR = if (col < cols - 1 && row < rows - 1) cornerRadius else 0f
+            val blR = if (col > 0 && row < rows - 1) cornerRadius else 0f
+            clipPath(Path().apply {
+                addRoundRect(dest, floatArrayOf(tlR, tlR, trR, trR, brR, brR, blR, blR), Path.Direction.CW)
+            })
         }
 
         private fun drawLoadingPill(canvas: Canvas) {
