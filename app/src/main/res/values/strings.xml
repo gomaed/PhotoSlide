@@ -71,15 +71,16 @@
 
     <!-- About screen -->
     <string name="about_tagline">Thanks for using PhotoSlide</string>
-    <string name="about_section_connect">Connect</string>
+    <string name="about_section_connect">Resources</string>
+    <string name="about_donate">Donate to Project</string>
     <string name="about_source_code">Source Code</string>
-    <string name="about_report_issue">Report an Issue</string>
-    <string name="about_section_legal">Legal</string>
-    <string name="about_privacy">Privacy Policy</string>
     <string name="about_license">License</string>
+    <string name="about_privacy">Privacy Policy</string>
+    <string name="about_section_contact">Contact</string>
+    <string name="about_report_issue">Open an Issue</string>
+    <string name="about_email">Send me an E-Mail</string>
+    <string name="about_section_other">Other</string>
     <string name="about_section_libraries">Third-Party Libraries</string>
-    <string name="about_mlkit_title">ML Kit Face Detection</string>
-    <string name="about_mlkit_desc">Google — Runs entirely on-device, no data leaves your phone</string>
-    <string name="about_section_app">App</string>
-    <string name="about_version">Version</string>
+    <string name="about_mlkit_title">ML Kit Face Detection (Local)</string>
+    <string name="about_version">About</string>
 </resources>

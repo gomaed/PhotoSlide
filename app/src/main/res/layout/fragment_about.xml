@@ -55,7 +55,7 @@
 
         </LinearLayout>
 
-        <!-- ── Connect ─────────────────────────────────────────────────── -->
+        <!-- ── Resources ───────────────────────────────────────────────── -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -65,14 +65,67 @@
             android:textAppearance="?attr/textAppearanceTitleSmall"
             android:textColor="?attr/colorPrimary" />
 
-        <!-- Source Code — TOP -->
+        <!-- Donate — TOP -->
+        <LinearLayout
+            android:id="@+id/row_donate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_setting_item_top"
+            android:foreground="?attr/selectableItemBackground"
+            android:padding="16dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_favorite"
+                android:tint="?attr/colorPrimary"
+                android:contentDescription="@null" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="16dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/about_donate"
+                    android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Ko-fi.com/gomaed"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_open_in_new"
+                android:tint="?attr/colorOnSurfaceVariant"
+                android:contentDescription="@null" />
+
+        </LinearLayout>
+
+        <!-- Gap -->
+        <View android:layout_width="match_parent" android:layout_height="2dp" />
+
+        <!-- Source Code — MID -->
         <LinearLayout
             android:id="@+id/row_github"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="@drawable/bg_setting_item_top"
+            android:background="@drawable/bg_setting_item_mid"
             android:foreground="?attr/selectableItemBackground"
             android:padding="16dp">
 
@@ -103,99 +156,14 @@
         <!-- Gap -->
         <View android:layout_width="match_parent" android:layout_height="2dp" />
 
-        <!-- Report Issue — BOT -->
+        <!-- License — MID -->
         <LinearLayout
-            android:id="@+id/row_issue"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="@drawable/bg_setting_item_bot"
-            android:foreground="?attr/selectableItemBackground"
-            android:padding="16dp"
-            android:layout_marginBottom="24dp">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_bug_report"
-                android:tint="?attr/colorPrimary"
-                android:contentDescription="@null" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="16dp"
-                android:text="@string/about_report_issue"
-                android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:src="@drawable/ic_open_in_new"
-                android:tint="?attr/colorOnSurfaceVariant"
-                android:contentDescription="@null" />
-
-        </LinearLayout>
-
-        <!-- ── Legal ───────────────────────────────────────────────────── -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingStart="4dp"
-            android:paddingBottom="8dp"
-            android:text="@string/about_section_legal"
-            android:textAppearance="?attr/textAppearanceTitleSmall"
-            android:textColor="?attr/colorPrimary" />
-
-        <!-- Privacy Policy — TOP -->
-        <LinearLayout
-            android:id="@+id/row_privacy"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@drawable/bg_setting_item_top"
-            android:foreground="?attr/selectableItemBackground"
+            android:background="@drawable/bg_setting_item_mid"
             android:padding="16dp">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_shield"
-                android:tint="?attr/colorPrimary"
-                android:contentDescription="@null" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="16dp"
-                android:text="@string/about_privacy"
-                android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:src="@drawable/ic_open_in_new"
-                android:tint="?attr/colorOnSurfaceVariant"
-                android:contentDescription="@null" />
-
-        </LinearLayout>
-
-        <!-- Gap -->
-        <View android:layout_width="match_parent" android:layout_height="2dp" />
-
-        <!-- License — BOT -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@drawable/bg_setting_item_bot"
-            android:padding="16dp"
-            android:layout_marginBottom="24dp">
 
             <ImageView
                 android:layout_width="24dp"
@@ -221,25 +189,147 @@
 
         </LinearLayout>
 
-        <!-- ── Libraries ───────────────────────────────────────────────── -->
+        <!-- Gap -->
+        <View android:layout_width="match_parent" android:layout_height="2dp" />
+
+        <!-- Privacy — BOT -->
+        <LinearLayout
+            android:id="@+id/row_privacy"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_setting_item_bot"
+            android:foreground="?attr/selectableItemBackground"
+            android:padding="16dp"
+            android:layout_marginBottom="24dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_shield"
+                android:tint="?attr/colorPrimary"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="16dp"
+                android:text="@string/about_privacy"
+                android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_open_in_new"
+                android:tint="?attr/colorOnSurfaceVariant"
+                android:contentDescription="@null" />
+
+        </LinearLayout>
+
+        <!-- ── Contact ─────────────────────────────────────────────────── -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingStart="4dp"
             android:paddingBottom="8dp"
-            android:text="@string/about_section_libraries"
+            android:text="@string/about_section_contact"
             android:textAppearance="?attr/textAppearanceTitleSmall"
             android:textColor="?attr/colorPrimary" />
 
-        <!-- ML Kit — SINGLE -->
+        <!-- Open an Issue — TOP -->
+        <LinearLayout
+            android:id="@+id/row_issue"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_setting_item_top"
+            android:foreground="?attr/selectableItemBackground"
+            android:padding="16dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_bug_report"
+                android:tint="?attr/colorPrimary"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="16dp"
+                android:text="@string/about_report_issue"
+                android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_open_in_new"
+                android:tint="?attr/colorOnSurfaceVariant"
+                android:contentDescription="@null" />
+
+        </LinearLayout>
+
+        <!-- Gap -->
+        <View android:layout_width="match_parent" android:layout_height="2dp" />
+
+        <!-- Send me an E-Mail — BOT -->
+        <LinearLayout
+            android:id="@+id/row_email"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_setting_item_bot"
+            android:foreground="?attr/selectableItemBackground"
+            android:padding="16dp"
+            android:layout_marginBottom="24dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_mail"
+                android:tint="?attr/colorPrimary"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="16dp"
+                android:text="@string/about_email"
+                android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_open_in_new"
+                android:tint="?attr/colorOnSurfaceVariant"
+                android:contentDescription="@null" />
+
+        </LinearLayout>
+
+        <!-- ── Other ───────────────────────────────────────────────────── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="4dp"
+            android:paddingBottom="8dp"
+            android:text="@string/about_section_other"
+            android:textAppearance="?attr/textAppearanceTitleSmall"
+            android:textColor="?attr/colorPrimary" />
+
+        <!-- ML Kit — TOP -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="@drawable/bg_setting_item"
-            android:padding="16dp"
-            android:layout_marginBottom="24dp">
+            android:background="@drawable/bg_setting_item_top"
+            android:padding="16dp">
 
             <ImageView
                 android:layout_width="24dp"
@@ -258,14 +348,14 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/about_mlkit_title"
+                    android:text="@string/about_section_libraries"
                     android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="@string/about_mlkit_desc"
+                    android:text="@string/about_mlkit_title"
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textColor="?attr/colorOnSurfaceVariant" />
 
@@ -273,23 +363,16 @@
 
         </LinearLayout>
 
-        <!-- ── App ─────────────────────────────────────────────────────── -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingStart="4dp"
-            android:paddingBottom="8dp"
-            android:text="@string/about_section_app"
-            android:textAppearance="?attr/textAppearanceTitleSmall"
-            android:textColor="?attr/colorPrimary" />
+        <!-- Gap -->
+        <View android:layout_width="match_parent" android:layout_height="2dp" />
 
-        <!-- Version — SINGLE -->
+        <!-- About / Version — BOT -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="@drawable/bg_setting_item"
+            android:background="@drawable/bg_setting_item_bot"
             android:padding="16dp">
 
             <ImageView

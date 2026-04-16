@@ -28,14 +28,22 @@ class AboutFragment : Fragment() {
         binding.versionHeader.text = "v${BuildConfig.VERSION_NAME}"
         binding.versionValue.text  = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
 
+        binding.rowDonate.setOnClickListener {
+            openUrl("https://ko-fi.com/gomaed")
+        }
         binding.rowGithub.setOnClickListener {
             openUrl("https://github.com/gomaed/PhotoSlide")
+        }
+        binding.rowPrivacy.setOnClickListener {
+            openUrl("https://github.com/gomaed/PhotoSlide/blob/master/PRIVACY.md")
         }
         binding.rowIssue.setOnClickListener {
             openUrl("https://github.com/gomaed/PhotoSlide/issues")
         }
-        binding.rowPrivacy.setOnClickListener {
-            openUrl("https://github.com/gomaed/PhotoSlide/blob/master/PRIVACY.md")
+        binding.rowEmail.setOnClickListener {
+            startActivity(Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("mailto:o0gomaed0o@gmail.com")
+            })
         }
     }
 
