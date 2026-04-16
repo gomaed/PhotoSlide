@@ -46,6 +46,10 @@ class AppPreferences(context: Context) {
         // Incremented by FaceScanner when an external scan finishes; the wallpaper
         // engine listens for changes to reload facesOnlyImages from disk.
         const val KEY_FACE_CACHE_UPDATED = "face_cache_updated"
+        // Newline-delimited URI lists — the exact photos shown in each cell at last save.
+        // Restored on startup so the wallpaper resumes the same selection after a reboot.
+        const val KEY_PORTRAIT_CELL_URIS  = "portrait_cell_uris"
+        const val KEY_LANDSCAPE_CELL_URIS = "landscape_cell_uris"
     }
 
     var selectedFolderUris: Set<String>
@@ -129,6 +133,14 @@ class AppPreferences(context: Context) {
     var faceCacheUpdated: Int
         get() = prefs.getInt(KEY_FACE_CACHE_UPDATED, 0)
         set(value) { prefs.edit().putInt(KEY_FACE_CACHE_UPDATED, value).apply() }
+
+    var portraitCellUris: String
+        get() = prefs.getString(KEY_PORTRAIT_CELL_URIS, "") ?: ""
+        set(value) { prefs.edit().putString(KEY_PORTRAIT_CELL_URIS, value).apply() }
+
+    var landscapeCellUris: String
+        get() = prefs.getString(KEY_LANDSCAPE_CELL_URIS, "") ?: ""
+        set(value) { prefs.edit().putString(KEY_LANDSCAPE_CELL_URIS, value).apply() }
 
     // 50 = no stagger (50/50), 70 = max stagger (70/30)
     var staggerRatio: Int

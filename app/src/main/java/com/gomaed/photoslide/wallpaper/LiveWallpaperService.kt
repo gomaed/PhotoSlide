@@ -29,6 +29,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -102,6 +103,9 @@ class LiveWallpaperService : WallpaperService() {
         FaceScanner.clearCache(this)
         FaceScanner.cancelScan()
         scanJob?.cancel()
+        // Folder set changed — saved URIs are stale; clear so reboot starts fresh random.
+        servicePrefs.portraitCellUris = ""
+        servicePrefs.landscapeCellUris = ""
     }
 
     private fun applySort(prefs: AppPreferences): List<Uri> = when (prefs.sortOrder) {
@@ -135,6 +139,21 @@ class LiveWallpaperService : WallpaperService() {
         private val prefs by lazy { AppPreferences(this@LiveWallpaperService) }
 
         private var refreshJob: Job? = null
+
+        // ── Preloaded bitmaps for the other orientation ───────────────────────────
+        // Decoded in the background while the current orientation is displayed.
+        // On rotation: if ready, swap in immediately (no decode, no flash).
+        private var otherBitmaps: Array<Bitmap?> = emptyArray()
+        private var otherFocusPoints: Array<android.graphics.PointF?> = emptyArray()
+        private var otherCellIndices: IntArray = IntArray(0)
+        private var otherPreloadJob: Job? = null
+
+        // ── Preloaded next bitmaps for the current orientation ────────────────────
+        // One bitmap per cell — the image that will appear on the next advance.
+        // On advance: if ready, use immediately (no decode, instant crossfade start).
+        private var nextBitmaps: Array<Bitmap?> = emptyArray()
+        private var nextFocusPoints: Array<android.graphics.PointF?> = emptyArray()
+        private var nextPreloadJob: Job? = null
 
         private var cellIndices: IntArray = IntArray(0)
         private var portraitCellIndices: IntArray = IntArray(0)
@@ -325,11 +344,9 @@ class LiveWallpaperService : WallpaperService() {
         private val currentCols  get() = if (isLandscape) prefs.landscapeCols else prefs.portraitCols
         private val currentRows  get() = if (isLandscape) prefs.landscapeRows else prefs.portraitRows
 
-        private fun cellRects(): List<RectF> {
-            val cols = currentCols
-            val rows = currentRows
-            val cellW = surfaceWidth / cols.toFloat()
-            val uniformCellH = surfaceHeight / rows.toFloat()
+        private fun cellRectsFor(width: Int, height: Int, cols: Int, rows: Int): List<RectF> {
+            val cellW = width / cols.toFloat()
+            val uniformCellH = height / rows.toFloat()
             val ratio = prefs.staggerRatio / 100f
 
             if (ratio <= 0.5f || rows <= 1) {
@@ -342,7 +359,7 @@ class LiveWallpaperService : WallpaperService() {
             val colTops = Array(cols) { col ->
                 val tallCount = (0 until rows).count { row -> (row + col) % 2 == 0 }
                 val shortCount = rows - tallCount
-                val k = surfaceHeight / (tallCount * ratio + shortCount * (1f - ratio))
+                val k = height / (tallCount * ratio + shortCount * (1f - ratio))
                 val tallH = ratio * k; val shortH = (1f - ratio) * k
                 FloatArray(rows + 1).also { tops ->
                     tops[0] = 0f
@@ -356,6 +373,8 @@ class LiveWallpaperService : WallpaperService() {
                 RectF(col * cellW, colTops[col][row], (col + 1) * cellW, colTops[col][row + 1])
             }
         }
+
+        private fun cellRects() = cellRectsFor(surfaceWidth, surfaceHeight, currentCols, currentRows)
 
         private val advanceRunnable = object : Runnable {
             override fun run() {
@@ -389,6 +408,14 @@ class LiveWallpaperService : WallpaperService() {
 
         override fun onDestroy() {
             super.onDestroy()
+            otherPreloadJob?.cancel()
+            nextPreloadJob?.cancel()
+            // Sync live cellIndices (may have advanced since last full reload) then persist.
+            if (cellIndices.isNotEmpty()) {
+                if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
+                else portraitCellIndices = cellIndices.copyOf()
+            }
+            saveCellUris(this@LiveWallpaperService.effectiveImages)
             prefs.unregisterChangeListener(this)
             handler.removeCallbacksAndMessages(null)
             handlerThread.quitSafely()
@@ -401,7 +428,12 @@ class LiveWallpaperService : WallpaperService() {
             isVisible = visible
             if (visible) {
                 if (this@LiveWallpaperService.images.isEmpty()) {
-                    startLoading()
+                    // Guard against a duplicate startLoading() — onSurfaceChanged may have
+                    // already started loading while images are still empty (e.g. during the
+                    // initial startup sequence).  Two concurrent loads produce two different
+                    // random shuffles, causing the second reloadAllBitmaps() to map the
+                    // restored indices against the wrong shuffle and show new photos.
+                    if (!isLoading) startLoading()
                 } else if (refreshJob?.isActive != true) {
                     // onSurfaceChanged already launched a refresh during rotation — skip the
                     // duplicate so the two decodes don't race each other and cause jank.
@@ -423,10 +455,62 @@ class LiveWallpaperService : WallpaperService() {
             }
             surfaceWidth = width
             surfaceHeight = height
-            if (this@LiveWallpaperService.images.isNotEmpty()) {
-                refreshJob?.cancel()
-                refreshJob = scope.launch { refreshBitmaps() }
-            } else {
+            val svc = this@LiveWallpaperService
+            if (svc.images.isNotEmpty()) {
+                val imgs = svc.effectiveImages
+                val newCols = if (isLandscape) prefs.landscapeCols else prefs.portraitCols
+                val newRows = if (isLandscape) prefs.landscapeRows else prefs.portraitRows
+                val needed  = newCols * newRows
+
+                if (otherBitmaps.size == needed && otherBitmaps.any { it != null }) {
+                    // ── Instant swap — preloaded bitmaps are ready ────────────────
+                    refreshJob?.cancel()
+                    nextPreloadJob?.cancel()
+
+                    bitmaps.forEach { it?.recycle() }
+                    fadingBitmaps.forEach { it?.recycle() }
+                    nextBitmaps.forEach { it?.recycle() }
+
+                    cellIndices      = otherCellIndices
+                    bitmaps          = otherBitmaps
+                    focusPoints      = otherFocusPoints
+                    fadingBitmaps    = Array(needed) { null }
+                    fadingFocusPoints = Array(needed) { null }
+                    fadeAlphas       = FloatArray(needed) { 1f }
+                    fadeStartTimes   = LongArray(needed) { 0L }
+                    fadeDurations    = LongArray(needed) { 0L }
+
+                    otherBitmaps    = emptyArray()
+                    otherFocusPoints = emptyArray()
+                    otherCellIndices = IntArray(0)
+                    otherPreloadJob = null
+
+                    if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
+                    else portraitCellIndices = cellIndices.copyOf()
+                    advanceCellPos = if (needed > 0) advanceCellPos % needed else 0
+
+                    nextBitmaps    = Array(needed) { null }
+                    nextFocusPoints = Array(needed) { null }
+
+                    saveCellUris(imgs)
+                    drawFrame()
+                    preloadNextBitmaps(imgs)
+                    preloadOtherOrientation(imgs)
+                } else {
+                    // ── Standard decode — preloaded bitmaps not ready yet ─────────
+                    refreshJob?.cancel()
+                    nextPreloadJob?.cancel()
+                    otherPreloadJob?.cancel()
+                    nextBitmaps.forEach { it?.recycle() }
+                    nextBitmaps    = emptyArray()
+                    nextFocusPoints = emptyArray()
+                    otherBitmaps.forEach { it?.recycle() }
+                    otherBitmaps    = emptyArray()
+                    otherFocusPoints = emptyArray()
+                    otherCellIndices = IntArray(0)
+                    refreshJob = scope.launch { refreshBitmaps() }
+                }
+            } else if (!isLoading) {
                 startLoading()
             }
         }
@@ -500,6 +584,19 @@ class LiveWallpaperService : WallpaperService() {
                         svc.rawImages = emptyList()
                         svc.images = emptyList()
                         svc.scanComplete = false
+                        // Wipe saved selections — library changed, old URIs are stale.
+                        prefs.portraitCellUris = ""
+                        prefs.landscapeCellUris = ""
+                        // Cancel decode/preload jobs and clear bitmaps immediately so the
+                        // old photos are not shown behind the loading spinner during rescan.
+                        refreshJob?.cancel(); otherPreloadJob?.cancel(); nextPreloadJob?.cancel()
+                        handler.removeCallbacks(fadeRunnable)
+                        recycleBitmaps()
+                        focusPoints = emptyArray(); fadingFocusPoints = emptyArray()
+                        otherFocusPoints = emptyArray(); nextFocusPoints = emptyArray()
+                        otherCellIndices = IntArray(0)
+                        fadeAlphas = FloatArray(0); fadeStartTimes = LongArray(0); fadeDurations = LongArray(0)
+                        drawFrame()
                         // Fresh scan — startLoading will check facesOnlyEnabled on completion
                         startLoading()
                     }
@@ -516,11 +613,12 @@ class LiveWallpaperService : WallpaperService() {
 
                 AppPreferences.KEY_FACE_CACHE_UPDATED -> {
                     // FaceScanner finished a scan (from fragment or service path).
-                    // Reload facesOnlyImages from the freshly written cache and redraw,
-                    // but only if no scan is currently running.
+                    // Reload facesOnlyImages from the freshly written cache and redraw.
+                    // Note: do NOT check FaceScanner.isScanning here — the counter increment
+                    // happens inside the still-active scan coroutine, so isScanning is still
+                    // true at this point. The counter changing IS the completion signal.
                     val svc = this@LiveWallpaperService
                     if (prefs.facesOnlyEnabled &&
-                        !FaceScanner.isScanning &&
                         svc.images.isNotEmpty()) {
                         scope.launch {
                             val cached = withContext(Dispatchers.IO) {
@@ -606,22 +704,200 @@ class LiveWallpaperService : WallpaperService() {
             handler.removeCallbacks(spinnerRunnable)
         }
 
+        /**
+         * Decode bitmaps for the other orientation in the background.
+         * Swapped surface dimensions are used to approximate cell sizes — close enough
+         * for power-of-2 sampling; the renderer scales to exact cell bounds at draw time.
+         * On rotation, [onSurfaceChanged] swaps these in instantly if they are ready.
+         */
+        private fun preloadOtherOrientation(imgs: List<Uri>) {
+            otherPreloadJob?.cancel()
+            if (imgs.isEmpty() || surfaceWidth == 0 || surfaceHeight == 0) return
+            otherPreloadJob = scope.launch {
+                val otherLandscape = !isLandscape
+                val otherCols = if (otherLandscape) prefs.landscapeCols else prefs.portraitCols
+                val otherRows = if (otherLandscape) prefs.landscapeRows else prefs.portraitRows
+                val rects = cellRectsFor(surfaceHeight, surfaceWidth, otherCols, otherRows)
+                val needed = rects.size
+
+                val savedInMemory = if (otherLandscape) landscapeCellIndices else portraitCellIndices
+                val indices = if (savedInMemory.size == needed) {
+                    IntArray(needed) { i -> savedInMemory[i] % imgs.size }
+                } else {
+                    restoreCellIndices(needed, imgs, otherLandscape) ?: run {
+                        val step = if (imgs.size > needed) imgs.size / needed else 1
+                        val offset = (0 until imgs.size).random()
+                        IntArray(needed) { i -> (offset + i * step) % imgs.size }
+                    }
+                }
+
+                val cellData = withContext(Dispatchers.IO) {
+                    coroutineScope {
+                        (0 until needed).map { i ->
+                            async {
+                                val r = rects[i]
+                                val bmp = try { decodeSampledBitmap(imgs[indices[i]], r.width().toInt(), r.height().toInt()) }
+                                          catch (_: Exception) { null }
+                                val focus = if (bmp != null && prefs.centerFacesEnabled)
+                                    FaceScanner.detectFocus(this@LiveWallpaperService, imgs[indices[i]]) else null
+                                bmp to focus
+                            }
+                        }.awaitAll()
+                    }
+                }
+
+                if (!isActive) { cellData.forEach { it.first?.recycle() }; return@launch }
+
+                val oldOther = otherBitmaps
+                otherCellIndices = indices
+                otherBitmaps = Array(needed) { cellData[it].first }
+                otherFocusPoints = Array(needed) { cellData[it].second }
+                oldOther.forEach { it?.recycle() }
+
+                // If the selection was randomly chosen (orientation never visited this session),
+                // persist it so a rotation shows the same images we just preloaded.
+                val alreadySaved = if (otherLandscape) landscapeCellIndices else portraitCellIndices
+                if (alreadySaved.isEmpty()) {
+                    if (otherLandscape) landscapeCellIndices = indices else portraitCellIndices = indices
+                    saveCellUris(imgs)
+                }
+            }
+        }
+
+        /**
+         * Decode the next-up bitmap for every cell in the background.
+         * On advance (timer or double-tap), [reloadCell] uses these immediately
+         * instead of decoding — enabling instant crossfade starts.
+         */
+        private fun preloadNextBitmaps(imgs: List<Uri>) {
+            nextPreloadJob?.cancel()
+            if (imgs.isEmpty() || cellIndices.isEmpty()) return
+            val capturedIndices = cellIndices.copyOf()
+            nextPreloadJob = scope.launch {
+                val rects = cellRects()
+                val cellData = withContext(Dispatchers.IO) {
+                    coroutineScope {
+                        capturedIndices.indices.map { i ->
+                            async {
+                                if (i >= rects.size) return@async null to null
+                                val nextIdx = (capturedIndices[i] + 1) % imgs.size
+                                val r = rects[i]
+                                val bmp = try { decodeSampledBitmap(imgs[nextIdx], r.width().toInt(), r.height().toInt()) }
+                                          catch (_: Exception) { null }
+                                val focus = if (bmp != null && prefs.centerFacesEnabled)
+                                    FaceScanner.detectFocus(this@LiveWallpaperService, imgs[nextIdx]) else null
+                                bmp to focus
+                            }
+                        }.awaitAll()
+                    }
+                }
+
+                if (!isActive) { cellData.forEach { it?.first?.recycle() }; return@launch }
+
+                val oldNext = nextBitmaps
+                nextBitmaps = Array(capturedIndices.size) { cellData.getOrNull(it)?.first }
+                nextFocusPoints = Array(capturedIndices.size) { cellData.getOrNull(it)?.second }
+                oldNext.forEach { it?.recycle() }
+            }
+        }
+
+        /**
+         * Preload the next bitmap for a single cell after it has just advanced.
+         * Called by [reloadCell] once the advance bitmap has been consumed.
+         */
+        private fun preloadNextBitmapForCell(cell: Int, imgs: List<Uri>) {
+            if (cell >= cellIndices.size || imgs.isEmpty()) return
+            val nextIdx = (cellIndices[cell] + 1) % imgs.size
+            scope.launch {
+                val rects = cellRects()
+                if (cell >= rects.size) return@launch
+                val r = rects[cell]
+                val bmp = withContext(Dispatchers.IO) {
+                    try { decodeSampledBitmap(imgs[nextIdx], r.width().toInt(), r.height().toInt()) }
+                    catch (_: Exception) { null }
+                }
+                val focus = if (bmp != null && prefs.centerFacesEnabled)
+                    FaceScanner.detectFocus(this@LiveWallpaperService, imgs[nextIdx]) else null
+                // Only store if the cell still expects this exact next image.
+                if (cell < nextBitmaps.size && cell < cellIndices.size &&
+                    (cellIndices[cell] + 1) % imgs.size == nextIdx) {
+                    nextBitmaps[cell]?.recycle()
+                    nextBitmaps[cell] = bmp
+                    nextFocusPoints[cell] = focus
+                } else {
+                    bmp?.recycle()
+                }
+            }
+        }
+
+        /**
+         * Persist both orientation URI lists so the wallpaper can restore the same
+         * selection after a reboot.  Only saves orientations that have been visited
+         * (non-empty index arrays).
+         */
+        private fun saveCellUris(imgs: List<Uri>) {
+            if (imgs.isEmpty()) return
+            if (portraitCellIndices.isNotEmpty()) {
+                prefs.portraitCellUris = portraitCellIndices.joinToString("\n") { idx ->
+                    imgs[idx % imgs.size].toString()
+                }
+            }
+            if (landscapeCellIndices.isNotEmpty()) {
+                prefs.landscapeCellUris = landscapeCellIndices.joinToString("\n") { idx ->
+                    imgs[idx % imgs.size].toString()
+                }
+            }
+        }
+
+        /**
+         * Try to map [needed] saved URIs back to indices in [imgs].
+         * Returns null if the saved list is missing, the wrong size, or any URI is
+         * no longer in the image pool — callers fall back to random selection.
+         */
+        private fun restoreCellIndices(needed: Int, imgs: List<Uri>, landscape: Boolean): IntArray? {
+            val raw = if (landscape) prefs.landscapeCellUris else prefs.portraitCellUris
+            if (raw.isBlank()) return null
+            val uriStrings = raw.split("\n").filter { it.isNotBlank() }
+            if (uriStrings.size != needed) return null
+            val uriToIndex = HashMap<String, Int>(imgs.size * 2)
+            imgs.forEachIndexed { idx, uri -> uriToIndex[uri.toString()] = idx }
+            val indices = IntArray(needed)
+            for (i in uriStrings.indices) {
+                indices[i] = uriToIndex[uriStrings[i]] ?: return null
+            }
+            return indices
+        }
+
         private suspend fun reloadAllBitmaps() {
             if (surfaceWidth == 0 || surfaceHeight == 0) return
+            // Cancel any in-flight preloads — indices and images are about to change.
+            otherPreloadJob?.cancel(); otherBitmaps.forEach { it?.recycle() }
+            nextPreloadJob?.cancel();  nextBitmaps.forEach  { it?.recycle() }
+            otherBitmaps = emptyArray(); otherFocusPoints = emptyArray(); otherCellIndices = IntArray(0)
+            nextBitmaps  = emptyArray(); nextFocusPoints  = emptyArray()
             val imgs = this@LiveWallpaperService.effectiveImages
             val rects = cellRects()
             val needed = rects.size
 
             val saved = if (isLandscape) landscapeCellIndices else portraitCellIndices
             cellIndices = if (saved.size == needed && imgs.isNotEmpty()) {
+                // In-memory selection from a previous rotation — use it directly.
                 IntArray(needed) { i -> saved[i] % imgs.size }
+            } else if (imgs.isNotEmpty()) {
+                // No in-memory selection: try to restore from the persisted URI list.
+                // Falls back to a fresh random spread if saved URIs don't match (reboot
+                // after folder change, grid resize, or first launch).
+                restoreCellIndices(needed, imgs, isLandscape) ?: run {
+                    val step = if (imgs.size > needed) imgs.size / needed else 1
+                    val offset = (0 until imgs.size).random()
+                    IntArray(needed) { i -> (offset + i * step) % imgs.size }
+                }
             } else {
-                val step = if (imgs.size > needed) imgs.size / needed else 1
-                val offset = if (imgs.isEmpty()) 0 else (0 until imgs.size).random()
-                IntArray(needed) { i -> if (imgs.isEmpty()) 0 else (offset + i * step) % imgs.size }
+                IntArray(needed) { 0 }
             }
             if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
             else portraitCellIndices = cellIndices.copyOf()
+            saveCellUris(imgs)
             advanceCellPos = if (needed > 0) advanceCellPos % needed else 0
 
             // ③ Parallel decode + face detection — all cells processed concurrently
@@ -643,23 +919,55 @@ class LiveWallpaperService : WallpaperService() {
             val newFocusPoints: Array<android.graphics.PointF?> = Array(needed) { cellData[it]?.second }
 
             handler.removeCallbacks(fadeRunnable)
-            val oldBitmaps = bitmaps; val oldFading = fadingBitmaps
-            bitmaps = newBitmaps
-            fadingBitmaps = Array(needed) { null }
-            focusPoints = newFocusPoints
-            fadingFocusPoints = Array(needed) { null }
-            fadeAlphas = FloatArray(needed) { 1f }
-            fadeStartTimes = LongArray(needed) { 0L }
-            fadeDurations = LongArray(needed) { 0L }
-            oldBitmaps.forEach { it?.recycle() }
+            val oldBitmaps     = bitmaps;      val oldFading      = fadingBitmaps
+            val oldFocusPoints = focusPoints
+            bitmaps      = newBitmaps
+            focusPoints  = newFocusPoints
+            val fadeDur = prefs.fadeDuration.toLong()
+            // Cross-fade from old photos when they exist and sizes match; otherwise fade
+            // from placeholder (initial load after spinner where bitmaps were cleared).
+            val canCrossFade = fadeDur > 0 && oldBitmaps.size == needed && oldBitmaps.any { it != null }
+            if (canCrossFade) {
+                fadingBitmaps     = oldBitmaps   // recycled by fadeRunnable on completion
+                fadingFocusPoints = if (oldFocusPoints.size == needed) oldFocusPoints else Array(needed) { null }
+                val now = SystemClock.uptimeMillis()
+                fadeAlphas     = FloatArray(needed) { 0f }
+                fadeStartTimes = LongArray(needed) { now }
+                fadeDurations  = LongArray(needed) { fadeDur }
+            } else if (fadeDur > 0) {
+                fadingBitmaps     = Array(needed) { null }
+                fadingFocusPoints = Array(needed) { null }
+                val now = SystemClock.uptimeMillis()
+                fadeAlphas     = FloatArray(needed) { 0f }
+                fadeStartTimes = LongArray(needed) { now }
+                fadeDurations  = LongArray(needed) { fadeDur }
+                oldBitmaps.forEach { it?.recycle() }
+            } else {
+                fadingBitmaps     = Array(needed) { null }
+                fadingFocusPoints = Array(needed) { null }
+                fadeAlphas     = FloatArray(needed) { 1f }
+                fadeStartTimes = LongArray(needed) { 0L }
+                fadeDurations  = LongArray(needed) { 0L }
+                oldBitmaps.forEach { it?.recycle() }
+            }
             oldFading.forEach { it?.recycle() }
             isLoading = false
             stopLoadingAnimation()
+            nextBitmaps    = Array(needed) { null }
+            nextFocusPoints = Array(needed) { null }
             drawFrame()
+            if (fadeDur > 0) handler.post(fadeRunnable)
+            preloadNextBitmaps(imgs)
+            preloadOtherOrientation(imgs)
         }
 
         private suspend fun refreshBitmaps() {
             if (surfaceWidth == 0 || surfaceHeight == 0) return
+            // Cancel any in-flight preloads — cell sizes are about to change.
+            otherPreloadJob?.cancel(); otherBitmaps.forEach { it?.recycle() }
+            nextPreloadJob?.cancel();  nextBitmaps.forEach  { it?.recycle() }
+            otherBitmaps = emptyArray(); otherFocusPoints = emptyArray(); otherCellIndices = IntArray(0)
+            nextBitmaps  = emptyArray(); nextFocusPoints  = emptyArray()
             val imgs = this@LiveWallpaperService.effectiveImages
             val rects = cellRects()
             val needed = rects.size
@@ -695,7 +1003,12 @@ class LiveWallpaperService : WallpaperService() {
             oldFading.forEach { it?.recycle() }
             if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
             else portraitCellIndices = cellIndices.copyOf()
+            saveCellUris(imgs)
+            nextBitmaps    = Array(needed) { null }
+            nextFocusPoints = Array(needed) { null }
             drawFrame()
+            preloadNextBitmaps(imgs)
+            preloadOtherOrientation(imgs)
         }
 
         private fun cellAtPosition(x: Float, y: Float): Int {
@@ -718,11 +1031,24 @@ class LiveWallpaperService : WallpaperService() {
             val r = rects[cellPos]
             val imageIdx = cellIndices[cellPos] % imgs.size
 
-            val newBitmap = withContext(Dispatchers.IO) {
-                try { decodeSampledBitmap(imgs[imageIdx], r.width().toInt(), r.height().toInt()) }
-                catch (_: Exception) { null }
+            // Use preloaded next bitmap if available — no decode needed, instant start.
+            val preloaded = nextBitmaps.getOrNull(cellPos)
+            val newBitmap: Bitmap?
+            val newFocus: android.graphics.PointF?
+            if (preloaded != null) {
+                newBitmap = preloaded
+                newFocus  = nextFocusPoints.getOrNull(cellPos)
+                nextBitmaps[cellPos]    = null
+                nextFocusPoints[cellPos] = null
+                preloadNextBitmapForCell(cellPos, imgs)
+            } else {
+                newBitmap = withContext(Dispatchers.IO) {
+                    try { decodeSampledBitmap(imgs[imageIdx], r.width().toInt(), r.height().toInt()) }
+                    catch (_: Exception) { null }
+                }
+                newFocus = if (newBitmap != null && prefs.centerFacesEnabled) FaceScanner.detectFocus(this@LiveWallpaperService, imgs[imageIdx]) else null
+                preloadNextBitmapForCell(cellPos, imgs)
             }
-            val newFocus = if (newBitmap != null && prefs.centerFacesEnabled) FaceScanner.detectFocus(this@LiveWallpaperService, imgs[imageIdx]) else null
             val oldFocus = focusPoints.getOrNull(cellPos)
             if (cellPos < focusPoints.size) focusPoints[cellPos] = newFocus
             if (cellPos < fadingFocusPoints.size) fadingFocusPoints[cellPos] = oldFocus
@@ -805,6 +1131,10 @@ class LiveWallpaperService : WallpaperService() {
                 if (fading != null) {
                     paint.alpha = 255
                     canvas.drawBitmap(fading, centerCropRect(fading.width, fading.height, dest.width().toInt(), dest.height().toInt(), fadingFocus?.x ?: 0.5f, fadingFocus?.y ?: 0.5f), dest, paint)
+                } else if (alpha < 1f) {
+                    // Fading in from placeholder — draw placeholder colour behind incoming bitmap
+                    placeholderPaint.color = placeholderColors[idx % 4]
+                    canvas.drawRect(dest, placeholderPaint)
                 }
                 if (bitmap != null) {
                     paint.alpha = (alpha * 255).toInt()
@@ -963,6 +1293,8 @@ class LiveWallpaperService : WallpaperService() {
         private fun recycleBitmaps() {
             bitmaps.forEach { it?.recycle() }; bitmaps = emptyArray()
             fadingBitmaps.forEach { it?.recycle() }; fadingBitmaps = emptyArray()
+            otherBitmaps.forEach { it?.recycle() }; otherBitmaps = emptyArray()
+            nextBitmaps.forEach { it?.recycle() }; nextBitmaps = emptyArray()
         }
     }
 }
