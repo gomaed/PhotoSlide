@@ -378,14 +378,25 @@ class LiveWallpaperService : WallpaperService() {
 
         private val advanceRunnable = object : Runnable {
             override fun run() {
-                val imgs = this@LiveWallpaperService.effectiveImages
-                if (imgs.isNotEmpty() && cellIndices.isNotEmpty()) {
-                    cellIndices[advanceCellPos] = (cellIndices[advanceCellPos] + 1) % imgs.size
-                    val cell = advanceCellPos
-                    advanceCellPos = (advanceCellPos + 1) % cellIndices.size
-                    scope.launch { reloadCell(cell, prefs.fadeDuration.toLong()) }
+                try {
+                    val imgs = this@LiveWallpaperService.effectiveImages
+                    // Snapshot cellIndices locally — the main thread can replace the array
+                    // between the isNotEmpty() check and the % size operation, which would
+                    // cause an ArithmeticException (divide by zero) and break the chain.
+                    val indices = cellIndices
+                    if (imgs.isNotEmpty() && indices.isNotEmpty()) {
+                        indices[advanceCellPos] = (indices[advanceCellPos] + 1) % imgs.size
+                        val cell = advanceCellPos
+                        advanceCellPos = (advanceCellPos + 1) % indices.size
+                        scope.launch { reloadCell(cell, prefs.fadeDuration.toLong()) }
+                    }
+                } catch (_: Exception) {
+                    // Swallow any unexpected error so the finally block always runs.
+                } finally {
+                    // Always reschedule — even if something above threw, the timer must
+                    // keep ticking so pictures don't freeze permanently.
+                    if (isVisible) scheduleNextAdvance()
                 }
-                if (isVisible) scheduleNextAdvance()
             }
         }
 
