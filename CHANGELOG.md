@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.2.7] — 2026-04-18
+
+### Fixed
+- Fix for a rare condition where interval changes could stop
+
+## [1.2.6] — 2026-04-17
+
+### Changed
+- Redesigned About page with three sections: **Resources** (Donate, Source Code, License, Privacy), **Contact** (Open an Issue, E-Mail), and **Other** (Third-Party Libraries, About)
+
+## [1.2.5] — 2026-04-16
+
+### Fixed
+- **Faces Only** feature not reloading the wallpaper when a background face scan completed (scan job was still active when the completion signal fired, causing the reload to be skipped)
+
+### Changed
+- **Rescan** now immediately clears the displayed photos and shows only placeholders + spinner while scanning, instead of keeping old photos visible behind the spinner
+- **Initial load / rescan** — photos now fade in from their placeholder colours when a scan completes (respects the Fade Duration setting; instant swap when set to 0)
+- **Reload on faces-only / sort change** — photos now cross-fade from the currently displayed set into the new selection instead of an instant swap
+- Gradle dependency update
+
 ## [1.2.4] — 2026-04-12
 
 ### Fixed
