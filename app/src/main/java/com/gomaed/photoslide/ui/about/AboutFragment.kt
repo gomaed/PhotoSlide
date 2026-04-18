@@ -34,6 +34,9 @@ class AboutFragment : Fragment() {
         binding.rowGithub.setOnClickListener {
             openUrl("https://github.com/gomaed/PhotoSlide")
         }
+        binding.rowLicense.setOnClickListener {
+            openUrl("https://github.com/gomaed/PhotoSlide/blob/master/LICENSE.md")
+        }
         binding.rowPrivacy.setOnClickListener {
             openUrl("https://github.com/gomaed/PhotoSlide/blob/master/PRIVACY.md")
         }

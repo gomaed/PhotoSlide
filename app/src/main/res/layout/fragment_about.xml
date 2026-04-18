@@ -158,11 +158,13 @@
 
         <!-- License — MID -->
         <LinearLayout
+            android:id="@+id/row_license"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@drawable/bg_setting_item_mid"
+            android:foreground="?attr/selectableItemBackground"
             android:padding="16dp">
 
             <ImageView
@@ -186,6 +188,14 @@
                 android:text="MIT"
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textColor="?attr/colorPrimary" />
+
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:src="@drawable/ic_open_in_new"
+                android:tint="?attr/colorOnSurfaceVariant"
+                android:contentDescription="@null" />
 
         </LinearLayout>
 
