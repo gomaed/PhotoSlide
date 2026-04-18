@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.8] — 2026-04-18
+
+### Changed
+- License row in About page is now tappable and links to the full MIT license text
+- Renamed `LICENSE` to `LICENSE.md`
+
 ## [1.2.7] — 2026-04-18
 
 ### Fixed
