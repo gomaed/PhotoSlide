@@ -41,7 +41,24 @@ jobs:
             --out app/build/outputs/apk/release/PhotoSlide-${{ github.ref_name }}.apk \
             app/build/outputs/apk/release/app-release-unsigned.apk
 
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          {
+            echo 'body<<EOF'
+            awk "
+              /^## \[$VERSION\]/ { p=1 }
+              p && /^## \[/ && !/^## \[$VERSION\]/ { exit }
+              p { print }
+            " CHANGELOG.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Upload APK to release
         uses: softprops/action-gh-release@v2.6.1
         with:
+          name: PhotoSlide ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.body }}
           files: app/build/outputs/apk/release/PhotoSlide-${{ github.ref_name }}.apk
