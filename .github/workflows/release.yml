@@ -49,10 +49,10 @@ jobs:
           {
             echo 'body<<EOF'
             awk "
-              /^## \[$VERSION\]/ { p=1 }
-              p && /^## \[/ && !/^## \[$VERSION\]/ { exit }
+              /^## \[$VERSION\]/ { p=1; next }
+              p && /^## \[/ { exit }
               p { print }
-            " CHANGELOG.md
+            " CHANGELOG.md | sed '/./,$!d' | sed -e :a -e '/^\s*$/{$d;N;ba}'
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
