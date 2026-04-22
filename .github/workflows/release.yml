@@ -41,36 +41,20 @@ jobs:
             --out app/build/outputs/apk/release/PhotoSlide-${{ github.ref_name }}.apk \
             app/build/outputs/apk/release/app-release-unsigned.apk
 
-      - name: Delete existing release
-        run: |
-          RELEASE_ID=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" \
-            | python3 -c "import sys,json; r=json.load(sys.stdin); print(r.get('id',''))" 2>/dev/null)
-          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "None" ]; then
-            curl -s -X DELETE \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
-          fi
-
-      - name: Extract changelog
-        id: changelog
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
-          {
-            echo 'body<<EOF'
-            awk "
-              /^## \[$VERSION\]/ { p=1; next }
-              p && /^## \[/ { exit }
-              p { print }
-            " CHANGELOG.md | sed '/./,$!d' | sed -e :a -e '/^\s*$/{$d;N;ba}'
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Upload APK to release
-        uses: softprops/action-gh-release@v2.6.1
-        with:
-          name: PhotoSlide ${{ github.ref_name }}
-          body: ${{ steps.changelog.outputs.body }}
-          files: app/build/outputs/apk/release/PhotoSlide-${{ github.ref_name }}.apk
+          VERSION_NUM="${VERSION#v}"
+          awk "
+            /^## \[$VERSION_NUM\]/ { p=1; next }
+            p && /^## \[/ { exit }
+            p { print }
+          " CHANGELOG.md | sed '/./,$!d' | sed -e :a -e '/^\s*$/{$d;N;ba}' | sed 's/^### /## /' > release_notes.md
+          gh release delete "$VERSION" --yes --repo "${{ github.repository }}" 2>/dev/null || true
+          gh release create "$VERSION" \
+            --title "PhotoSlide $VERSION" \
+            --notes-file release_notes.md \
+            --repo "${{ github.repository }}" \
+            "app/build/outputs/apk/release/PhotoSlide-$VERSION.apk"
