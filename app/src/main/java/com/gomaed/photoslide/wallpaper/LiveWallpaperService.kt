@@ -159,6 +159,7 @@ class LiveWallpaperService : WallpaperService() {
         private var portraitCellIndices: IntArray = IntArray(0)
         private var landscapeCellIndices: IntArray = IntArray(0)
         private var advanceCellPos = 0
+        private var advanceCellQueue: ArrayDeque<Int> = ArrayDeque()
         private var bitmaps: Array<Bitmap?> = emptyArray()
         private var fadingBitmaps: Array<Bitmap?> = emptyArray()
         private var focusPoints: Array<android.graphics.PointF?> = emptyArray()
@@ -322,6 +323,7 @@ class LiveWallpaperService : WallpaperService() {
                         when (prefs.doubleTapAction) {
                             AppPreferences.DOUBLE_TAP_SWAP -> {
                                 cellIndices[cell] = (cellIndices[cell] + 1) % imgs.size
+                                prefs.lastAdvanceTime = System.currentTimeMillis()
                                 scope.launch { reloadCell(cell, if (prefs.fadeDuration == 0) 0L else 200L) }
                             }
                             AppPreferences.DOUBLE_TAP_OPEN -> {
@@ -385,9 +387,11 @@ class LiveWallpaperService : WallpaperService() {
                     // cause an ArithmeticException (divide by zero) and break the chain.
                     val indices = cellIndices
                     if (imgs.isNotEmpty() && indices.isNotEmpty()) {
+                        if (advanceCellQueue.isEmpty())
+                            advanceCellQueue.addAll(indices.indices.shuffled())
+                        advanceCellPos = advanceCellQueue.removeFirst()
                         indices[advanceCellPos] = (indices[advanceCellPos] + 1) % imgs.size
                         val cell = advanceCellPos
-                        advanceCellPos = (advanceCellPos + 1) % indices.size
                         scope.launch { reloadCell(cell, prefs.fadeDuration.toLong()) }
                     }
                 } catch (_: Exception) {
@@ -395,6 +399,7 @@ class LiveWallpaperService : WallpaperService() {
                 } finally {
                     // Always reschedule — even if something above threw, the timer must
                     // keep ticking so pictures don't freeze permanently.
+                    prefs.lastAdvanceTime = System.currentTimeMillis()
                     if (isVisible) scheduleNextAdvance()
                 }
             }
@@ -403,8 +408,11 @@ class LiveWallpaperService : WallpaperService() {
         private fun scheduleNextAdvance() {
             handler.removeCallbacks(advanceRunnable)
             val interval = prefs.slideInterval
-            if (interval != AppPreferences.INTERVAL_NEVER)
-                handler.postDelayed(advanceRunnable, interval * 1000L)
+            if (interval == AppPreferences.INTERVAL_NEVER) return
+            val intervalMs = interval * 1000L
+            val elapsed = System.currentTimeMillis() - prefs.lastAdvanceTime
+            val delay = (intervalMs - elapsed).coerceIn(0L, intervalMs)
+            handler.postDelayed(advanceRunnable, delay)
         }
 
         override fun onCreate(surfaceHolder: SurfaceHolder) {
@@ -499,6 +507,7 @@ class LiveWallpaperService : WallpaperService() {
                     if (isLandscape) landscapeCellIndices = cellIndices.copyOf()
                     else portraitCellIndices = cellIndices.copyOf()
                     advanceCellPos = if (needed > 0) advanceCellPos % needed else 0
+                    advanceCellQueue.clear()
 
                     nextBitmaps    = Array(needed) { null }
                     nextFocusPoints = Array(needed) { null }
@@ -910,6 +919,7 @@ class LiveWallpaperService : WallpaperService() {
             else portraitCellIndices = cellIndices.copyOf()
             saveCellUris(imgs)
             advanceCellPos = if (needed > 0) advanceCellPos % needed else 0
+            advanceCellQueue.clear()
 
             // ③ Parallel decode + face detection — all cells processed concurrently
             val cellData = withContext(Dispatchers.IO) {

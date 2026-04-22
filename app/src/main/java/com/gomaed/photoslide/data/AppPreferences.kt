@@ -50,6 +50,8 @@ class AppPreferences(context: Context) {
         // Restored on startup so the wallpaper resumes the same selection after a reboot.
         const val KEY_PORTRAIT_CELL_URIS  = "portrait_cell_uris"
         const val KEY_LANDSCAPE_CELL_URIS = "landscape_cell_uris"
+        // Wall-clock ms of the last auto-advance; used to compute remaining delay on resume.
+        const val KEY_LAST_ADVANCE_TIME = "last_advance_time"
     }
 
     var selectedFolderUris: Set<String>
@@ -141,6 +143,10 @@ class AppPreferences(context: Context) {
     var landscapeCellUris: String
         get() = prefs.getString(KEY_LANDSCAPE_CELL_URIS, "") ?: ""
         set(value) { prefs.edit().putString(KEY_LANDSCAPE_CELL_URIS, value).apply() }
+
+    var lastAdvanceTime: Long
+        get() = prefs.getLong(KEY_LAST_ADVANCE_TIME, 0L)
+        set(value) { prefs.edit().putLong(KEY_LAST_ADVANCE_TIME, value).apply() }
 
     // 50 = no stagger (50/50), 70 = max stagger (70/30)
     var staggerRatio: Int

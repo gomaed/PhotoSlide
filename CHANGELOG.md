@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0] — 2026-04-22
+
+### Fixed
+- Slide interval now counts wall-clock time — photos advance correctly after the screen has been off for longer than the set interval, instead of only counting time while the screen is on
+
+### Changed
+- Photos now change in a shuffled random cell order: every cell in the grid changes exactly once per cycle before the order is reshuffled, instead of cycling top-left → top-right → … in a fixed sequence
+
 ## [1.2.9] — 2026-04-22
 
 ### Fixed
