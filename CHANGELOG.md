@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.9] — 2026-04-22
+
+### Fixed
+- Back button on Samsung devices (3-button navigation) now navigates between settings tabs instead of immediately exiting the app
+
 ## [1.2.8] — 2026-04-18
 
 ### Changed

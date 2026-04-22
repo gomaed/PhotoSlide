@@ -6,9 +6,11 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.View
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
+import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.gomaed.photoslide.R
@@ -19,6 +21,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
     private lateinit var prefs: AppPreferences
+    private lateinit var navController: NavController
 
     private val scanningListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == AppPreferences.KEY_IS_SCANNING ||
@@ -52,11 +55,23 @@ class SettingsActivity : AppCompatActivity() {
 
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        val navController = navHostFragment.navController
+        navController = navHostFragment.navController
 
         binding.bottomNavigation.setupWithNavController(navController)
 
+        // Samsung 3-button nav can bypass the NavHostFragment's OnBackPressedCallback,
+        // so we register an explicit callback here at the activity level.
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (!navController.popBackStack()) finish()
+            }
+        })
+
         goToFoldersIfRequested(intent)
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        return navController.navigateUp() || super.onSupportNavigateUp()
     }
 
     override fun onNewIntent(intent: Intent) {
